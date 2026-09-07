@@ -3,6 +3,7 @@ import type { InfoResponse } from "./../types/portweaver/index";
 import type { DdnsStatusResponse } from "@/types/portweaver/ddns";
 import type { FrpcProxyStats } from "@/types/portweaver/frpc";
 import type { FrpsProxyStats } from "@/types/portweaver/frps";
+import type { RatholeMode, RatholeStatus } from "@/types/portweaver/rathole";
 
 export interface WolWakeResponse {
   success: boolean;
@@ -37,6 +38,20 @@ export interface FrpConfigResponse {
 }
 
 export function createRpcClient(rpc: typeof L.rpc) {
+  const getRatholeStatus = rpc.declare<RatholeStatus>({
+    object: "portweaver",
+    method: "get_rathole_status",
+  });
+  const getRatholeInfo = rpc.declare<InfoResponse, [RatholeMode, string]>({
+    object: "portweaver",
+    method: "get_rathole_info",
+    params: ["mode", "name"],
+  });
+  const clearRatholeLogs = rpc.declare<void, [RatholeMode, string]>({
+    object: "portweaver",
+    method: "clear_rathole_logs",
+    params: ["mode", "name"],
+  });
   const listProjects = rpc.declare<{ projects: ProjectStatus[] }>({
     object: "portweaver",
     method: "list_projects",
@@ -188,6 +203,9 @@ export function createRpcClient(rpc: typeof L.rpc) {
     getDdnsInfo,
     clearDdnsLogs,
     getFrpsInfo,
+    getRatholeStatus,
+    getRatholeInfo,
+    clearRatholeLogs,
     clearFrpsLogs,
     getFrpsProxyStats,
     getFullStatus,

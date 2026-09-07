@@ -164,6 +164,8 @@ export interface VersionResponse {
   ubus_mode: boolean;
   frpc_mode: boolean;
   frps_mode: boolean;
+  rathole_client_mode?: boolean;
+  rathole_server_mode?: boolean;
   ddns_mode: boolean;
   nftables_mode: boolean;
   wol_mode: boolean;

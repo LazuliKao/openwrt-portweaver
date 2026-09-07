@@ -2,6 +2,7 @@ import { Client } from "./modules/client";
 import type { FullStatusResponse, VersionResponse } from "./types/portweaver";
 import frpc from "./modules/frpc";
 import frps from "./modules/frps";
+import rathole from "./modules/rathole";
 import config from "./modules/config";
 import header from "./modules/header";
 import logs from "./modules/logs";
@@ -64,6 +65,11 @@ export class main extends L.view {
 
     s.tab("settings", _("Global Settings"));
     s.tab("projects", _("Port Forwarding"));
+    const version = data[3] as VersionResponse | null;
+    if (version?.rathole_client_mode)
+      s.tab("rathole_client", _("Rathole Client"));
+    if (version?.rathole_server_mode)
+      s.tab("rathole_server", _("Rathole Server"));
     if (isFeatureEnabled("wol_mode")) {
       s.tab("wol", _("Wake-on-LAN"));
     }
@@ -88,6 +94,8 @@ export class main extends L.view {
 
     header(m, s, client, "settings");
     config(m, s, client, "projects");
+    if (version?.rathole_client_mode) rathole(s, "client");
+    if (version?.rathole_server_mode) rathole(s, "server");
     if (isFeatureEnabled("wol_mode")) {
       wol(m, s, "wol");
     }
