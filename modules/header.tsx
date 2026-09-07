@@ -34,6 +34,28 @@ export default function (
   {
     const o = s.taboption(
       tab_id,
+      form.Value,
+      "frp_config_root",
+      _("FRP Configuration Root"),
+    );
+    o.rmempty = false;
+    o.default = "/etc/portweaver";
+    o.placeholder = "/etc/portweaver";
+    o.description = _(
+      "Trusted root for external FRPC and FRPS configuration files. Save and reload after changing this path before using file editor actions.",
+    );
+    o.validate = (_sectionId: string, value: unknown) => {
+      const path = String(value || "");
+      if (!path.startsWith("/") || path === "/")
+        return _(
+          "Configuration root must be an absolute directory other than /.",
+        );
+      return true;
+    };
+  }
+  {
+    const o = s.taboption(
+      tab_id,
       form.DummyValue,
       "_runtime_status",
       _("Runtime Status"),

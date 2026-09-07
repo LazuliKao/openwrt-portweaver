@@ -1,8 +1,10 @@
 import { LogViewerDialog } from "@/components/LogViewerDialog";
+import { addFrpConfigSource } from "@/components/FrpConfigSource";
 import { ProxyStatsViewer } from "@/components/ProxyStatsViewer";
 import { rpcClient } from "@/utils/rpc-client";
 import { getThemeColors } from "@/utils/theme-utils";
 const form = L.form;
+const EXTERNAL_CLIENT_NAME = "__external_frpc__";
 
 type FrpState =
   | "connected"
@@ -46,6 +48,8 @@ export default function (
   s: LuCI.form.NamedSection,
   tab_id: string,
 ) {
+  addFrpConfigSource(s, tab_id, "frpc");
+
   const o = s.taboption(
     tab_id,
     form.SectionValue,
@@ -53,12 +57,102 @@ export default function (
     form.GridSection,
     "frpc_node",
   );
+  o.depends("frpc_config_mode", "builtin");
 
   const ss = o.subsection as LuCI.form.GridSection;
   ss.anonymous = true;
   ss.addremove = true;
   ss.sortable = true;
   ss.cloneable = true;
+
+  {
+    const externalStatus = s.taboption(
+      tab_id,
+      form.DummyValue,
+      "_frpc_external_status",
+      _("External FRPC Status"),
+    );
+    externalStatus.depends("frpc_config_mode", "external_file");
+    externalStatus.depends("frpc_config_mode", "external_uci");
+    externalStatus.textvalue = () => {
+      const info = nodeStatuses[EXTERNAL_CLIENT_NAME] || {
+        status: "unavailable" as FrpState,
+      };
+      const status = info.status || "unavailable";
+      const colors = getStatusColors();
+      const container = (
+        <span style="display:flex; align-items:center;">
+          <span
+            style={`display:inline-block; width:12px; height:12px; border-radius:50%; background-color:${colors[status]}; margin-right:8px;`}
+          ></span>
+          <span>{STATUS_LABELS[status]}</span>
+        </span>
+      ) as HTMLElement;
+      statusElements[EXTERNAL_CLIENT_NAME] = container;
+      return container;
+    };
+  }
+
+  {
+    const externalLogs = s.taboption(
+      tab_id,
+      form.DummyValue,
+      "_frpc_external_logs",
+      _("External FRPC Logs"),
+    );
+    externalLogs.depends("frpc_config_mode", "external_file");
+    externalLogs.depends("frpc_config_mode", "external_uci");
+    externalLogs.textvalue = () => {
+      const isRunning =
+        (nodeStatuses[EXTERNAL_CLIENT_NAME]?.status || "stopped") !== "stopped";
+      const button = (
+        <button
+          type="button"
+          class="cbi-button cbi-button-action"
+          onclick={() => {
+            const logViewer = new LogViewerDialog({
+              name: EXTERNAL_CLIENT_NAME,
+              title: _("External FRPC Logs"),
+              fetcher: async () =>
+                await rpcClient.getFrpcInfo(EXTERNAL_CLIENT_NAME),
+              clearer: async () =>
+                await rpcClient.clearFrpcLogs(EXTERNAL_CLIENT_NAME),
+            });
+            logViewer.open();
+          }}
+          disabled={!isRunning}
+        >
+          {_("View Logs")}
+        </button>
+      ) as HTMLButtonElement;
+      actionButtons[EXTERNAL_CLIENT_NAME] = button;
+      return button;
+    };
+  }
+
+  {
+    const externalStats = s.taboption(
+      tab_id,
+      form.DummyValue,
+      "_frpc_external_proxy_stats",
+      _("External FRPC Proxy Stats"),
+    );
+    externalStats.depends("frpc_config_mode", "external_file");
+    externalStats.depends("frpc_config_mode", "external_uci");
+    externalStats.textvalue = () => {
+      const container = (
+        <div style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+      ) as HTMLElement;
+      const statsViewer = new ProxyStatsViewer({
+        clientId: EXTERNAL_CLIENT_NAME,
+        rpcClient,
+      });
+      const statsEl = statsViewer.render();
+      statsEl.style.cssText = `flex: 1; min-width: 300px; ${statsEl.style.cssText}`;
+      container.appendChild(statsEl);
+      return container;
+    };
+  }
 
   ss.sectiontitle = (section_id: string) =>
     (L.uci.get("portweaver", section_id, "name") as string) ||
@@ -250,13 +344,24 @@ export default function (
 
   async function pollFrpStatus() {
     try {
-      const sections = await L.uci.sections("portweaver", "frpc_node");
-      const promises = sections.map((sec: any) => {
-        const nodeName = sec.name as string;
+      const mode =
+        (L.uci.get("portweaver", "global", "frpc_config_mode") as string) ||
+        "builtin";
+      const nodes =
+        mode === "builtin"
+          ? (await L.uci.sections("portweaver", "frpc_node")).map(
+              (sec: any) => ({
+                key: sec[".name"] as string,
+                name: sec.name as string,
+              }),
+            )
+          : [{ key: EXTERNAL_CLIENT_NAME, name: EXTERNAL_CLIENT_NAME }];
+      const promises = nodes.map((node) => {
+        const nodeName = node.name;
         return rpcClient
           .getFrpcInfo(nodeName)
           .then((res) => {
-            const oldStatus = nodeStatuses[sec[".name"]]?.status;
+            const oldStatus = nodeStatuses[node.key]?.status;
             const rawStatus = res.status ?? "unavailable";
             const newStatus: FrpState = [
               "connected",
@@ -268,13 +373,13 @@ export default function (
               ? (rawStatus as FrpState)
               : ("unavailable" as FrpState);
 
-            nodeStatuses[sec[".name"]] = {
+            nodeStatuses[node.key] = {
               status: newStatus,
               last_error: res.last_error || "",
             };
 
             if (oldStatus !== newStatus) {
-              const container = statusElements[sec[".name"]];
+              const container = statusElements[node.key];
               if (container && container.childNodes.length >= 2) {
                 const indicator = container.childNodes[0] as HTMLElement;
                 const textSpan = container.childNodes[1] as HTMLElement;
@@ -283,13 +388,12 @@ export default function (
                 const colors = getStatusColors();
                 const statusColor = colors[newStatus] || colors.unavailable;
                 indicator.style.backgroundColor = statusColor;
-                indicator.style.backgroundColor = statusColor;
 
                 const statusText = STATUS_LABELS[newStatus] || newStatus;
                 textSpan.textContent = statusText;
               }
 
-              const actionBtn = actionButtons[sec[".name"]];
+              const actionBtn = actionButtons[node.key];
               if (actionBtn) {
                 const isRunning = newStatus !== "stopped";
                 actionBtn.disabled = !isRunning;
@@ -297,12 +401,12 @@ export default function (
             }
           })
           .catch(() => {
-            nodeStatuses[sec[".name"]] = {
+            nodeStatuses[node.key] = {
               status: "error",
               last_error: "Failed to fetch status",
             };
 
-            const container = statusElements[sec[".name"]];
+            const container = statusElements[node.key];
             if (container && container.childNodes.length >= 2) {
               const indicator = container.childNodes[0] as HTMLElement;
               const textSpan = container.childNodes[1] as HTMLElement;
@@ -310,7 +414,7 @@ export default function (
               textSpan.textContent = _("Error");
             }
 
-            const actionBtn = actionButtons[sec[".name"]];
+            const actionBtn = actionButtons[node.key];
             if (actionBtn) {
               actionBtn.disabled = true;
             }

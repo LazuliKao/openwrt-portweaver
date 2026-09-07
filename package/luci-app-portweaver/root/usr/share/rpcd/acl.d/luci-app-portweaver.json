@@ -27,6 +27,8 @@
 					"get_frps_proxy_stats",
 					"list_projects",
 					"get_nftables_rules",
+					"read_frp_config",
+					"validate_frp_config",
 					"wol_status"
 				]
 			}
@@ -51,6 +53,7 @@
 					"clear_frps_logs",
 					"reload_config",
 					"restart_project",
+					"write_frp_config",
 					"wol_wake"
 				]
 			}

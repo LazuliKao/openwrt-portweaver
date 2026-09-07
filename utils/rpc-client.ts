@@ -27,6 +27,15 @@ export interface WolStatusResponse {
   last_error: string | null;
 }
 
+export type FrpConfigKind = "frpc" | "frps";
+export type FrpConfigFormat = "toml" | "yaml" | "json";
+
+export interface FrpConfigResponse {
+  success: boolean;
+  content: string;
+  error: string;
+}
+
 export function createRpcClient(rpc: typeof L.rpc) {
   const listProjects = rpc.declare<{ projects: ProjectStatus[] }>({
     object: "portweaver",
@@ -110,6 +119,32 @@ export function createRpcClient(rpc: typeof L.rpc) {
     method: "reload_config",
   });
 
+  const readFrpConfig = rpc.declare<FrpConfigResponse, [FrpConfigKind, string]>(
+    {
+      object: "portweaver",
+      method: "read_frp_config",
+      params: ["kind", "path"],
+    },
+  );
+
+  const validateFrpConfig = rpc.declare<
+    FrpConfigResponse,
+    [FrpConfigKind, FrpConfigFormat, string]
+  >({
+    object: "portweaver",
+    method: "validate_frp_config",
+    params: ["kind", "format", "content"],
+  });
+
+  const writeFrpConfig = rpc.declare<
+    FrpConfigResponse,
+    [FrpConfigKind, FrpConfigFormat, string, string, boolean]
+  >({
+    object: "portweaver",
+    method: "write_frp_config",
+    params: ["kind", "format", "path", "content", "reload"],
+  });
+
   const restartProject = rpc.declare<
     { id: number; status: string },
     [id: number]
@@ -158,6 +193,9 @@ export function createRpcClient(rpc: typeof L.rpc) {
     getFullStatus,
     getNftablesRules,
     reloadConfig,
+    readFrpConfig,
+    validateFrpConfig,
+    writeFrpConfig,
     restartProject,
     wolWake,
     wolStatus,

@@ -1,4 +1,5 @@
 import { LogViewerDialog } from "@/components/LogViewerDialog";
+import { addFrpConfigSource } from "@/components/FrpConfigSource";
 import { rpcClient } from "@/utils/rpc-client";
 import { getThemeColors } from "@/utils/theme-utils";
 const form = L.form;
@@ -49,83 +50,7 @@ export default function (
   s: LuCI.form.NamedSection,
   tab_id: string,
 ) {
-  {
-    const o = s.taboption(
-      tab_id,
-      form.ListValue,
-      "frps_config_mode",
-      _("Configuration Source"),
-    );
-    o.rmempty = false;
-    o.default = "builtin";
-    o.value("builtin", _("Built-in Nodes"));
-    o.value("external_file", _("External File"));
-    o.value("external_uci", _("UCI Configuration Text"));
-    o.description = _(
-      "External sources use the official FRPS configuration format and replace all built-in nodes.",
-    );
-    o.write = (section_id: string, formvalue: string): null => {
-      const mode = String(formvalue);
-      L.uci.set("portweaver", section_id, "frps_config_mode", mode);
-
-      if (mode === "external_file") {
-        L.uci.unset("portweaver", section_id, "frps_config_content");
-      } else if (mode === "external_uci") {
-        L.uci.unset("portweaver", section_id, "frps_config_path");
-      } else {
-        L.uci.unset("portweaver", section_id, "frps_config_path");
-        L.uci.unset("portweaver", section_id, "frps_config_content");
-      }
-      return null;
-    };
-  }
-
-  {
-    const o = s.taboption(
-      tab_id,
-      form.ListValue,
-      "frps_config_format",
-      _("Configuration Format"),
-    );
-    o.rmempty = false;
-    o.default = "toml";
-    o.value("toml", "TOML");
-    o.value("yaml", "YAML");
-    o.value("json", "JSON");
-    o.depends("frps_config_mode", "external_file");
-    o.depends("frps_config_mode", "external_uci");
-  }
-
-  {
-    const o = s.taboption(
-      tab_id,
-      form.Value,
-      "frps_config_path",
-      _("Configuration File Path"),
-    );
-    o.rmempty = false;
-    o.placeholder = "/etc/portweaver/frps.toml";
-    o.description = _(
-      "Absolute path to an official FRPS TOML, YAML, or JSON configuration file.",
-    );
-    o.depends("frps_config_mode", "external_file");
-  }
-
-  {
-    const o = s.taboption(
-      tab_id,
-      form.TextValue,
-      "frps_config_content",
-      _("FRPS Configuration"),
-    );
-    o.rmempty = false;
-    o.rows = 18;
-    o.wrap = "off";
-    o.description = _(
-      "Official FRPS TOML, YAML, or JSON configuration stored directly in UCI.",
-    );
-    o.depends("frps_config_mode", "external_uci");
-  }
+  addFrpConfigSource(s, tab_id, "frps");
 
   const o = s.taboption(
     tab_id,
