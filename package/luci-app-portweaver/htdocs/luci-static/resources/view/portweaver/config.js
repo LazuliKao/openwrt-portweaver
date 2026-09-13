@@ -1695,7 +1695,7 @@ class FrpConfigSource_n {
     }
 }
 function FrpConfigSource_i(e, t, o) {
-    let n = e.formvalue(t);
+    let n = L.uci.get("portweaver", e, t);
     return "string" == typeof n && n ? n : o;
 }
 function addFrpNodeConfigSource(e, r) {
@@ -1711,9 +1711,9 @@ function addFrpNodeConfigSource(e, r) {
     let f = e.option(createFrpExternalConfigEditor({
         kind: r,
         optionName: "config_content",
-        getMode: (e)=>l.get(e, "mode", FrpConfigSource_i(s, e, "builtin")),
-        getFormat: (e)=>l.get(e, "format", FrpConfigSource_i(c, e, "toml")),
-        getPath: (e)=>l.get(e, "path", FrpConfigSource_i(u, e, "")),
+        getMode: (e)=>l.get(e, "mode", FrpConfigSource_i(e, "config_mode", "builtin")),
+        getFormat: (e)=>l.get(e, "format", FrpConfigSource_i(e, "config_format", "toml")),
+        getPath: (e)=>l.get(e, "path", FrpConfigSource_i(e, "config_path", "")),
         subscribeSourceChanges: (e, t)=>l.subscribe(e, t)
     }), "config_content", _("".concat(a, " Configuration")));
     f.modalonly = !0, f.rmempty = !1, f.depends("config_mode", "external_file"), f.depends("config_mode", "external_uci");

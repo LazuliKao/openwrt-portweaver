@@ -5,10 +5,6 @@ const form = L.form;
 
 type SourceField = "mode" | "format" | "path";
 
-type FormOption = {
-  formvalue(sectionId: string): unknown;
-};
-
 class NodeSourceValues {
   private readonly values = new Map<
     string,
@@ -38,12 +34,12 @@ class NodeSourceValues {
   }
 }
 
-function optionValue(
-  option: FormOption,
+function uciOptionValue(
   sectionId: string,
+  optionName: string,
   fallback: string,
 ): string {
-  const value = option.formvalue(sectionId);
+  const value = L.uci.get("portweaver", sectionId, optionName);
   return typeof value === "string" && value ? value : fallback;
 }
 
@@ -132,23 +128,19 @@ export function addFrpNodeConfigSource(
         values.get(
           sectionId,
           "mode",
-          optionValue(
-            modeOption as unknown as FormOption,
-            sectionId,
-            "builtin",
-          ),
+          uciOptionValue(sectionId, "config_mode", "builtin"),
         ),
       getFormat: (sectionId) =>
         values.get(
           sectionId,
           "format",
-          optionValue(formatOption as unknown as FormOption, sectionId, "toml"),
+          uciOptionValue(sectionId, "config_format", "toml"),
         ) as FrpEditorFormat,
       getPath: (sectionId) =>
         values.get(
           sectionId,
           "path",
-          optionValue(pathOption as unknown as FormOption, sectionId, ""),
+          uciOptionValue(sectionId, "config_path", ""),
         ),
       subscribeSourceChanges: (sectionId, listener) =>
         values.subscribe(sectionId, listener),
