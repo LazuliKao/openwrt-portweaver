@@ -373,7 +373,7 @@ class FrpExternalConfigEditor extends L.form.Value {
       <div class="cbi-value-field">
         <p style="margin-top:0;">
           {_(
-            "Use the advanced editor for JSON schema validation and completion. YAML and TOML receive schema-based option completion; saving always uses the official FRP validator.",
+            "JSON and YAML provide schema validation and completion. TOML provides schema-based option completion; saving always uses the official FRP validator.",
           )}
         </p>
         {editorSettings}
