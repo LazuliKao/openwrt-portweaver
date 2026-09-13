@@ -1,10 +1,6 @@
 import { esmProvider } from "./esm";
-import {
-  esmrunProvider,
-  fastlyProvider,
-  gcoreProvider,
-  jsdelivrProvider,
-} from "./jsdelivr";
+import { esmrunProvider } from "./esmrun";
+import { fastlyProvider, gcoreProvider, jsdelivrProvider } from "./jsdelivr";
 import type { MonacoCdnProvider } from "./types";
 import { esmUnpkgProvider, unpkgProvider } from "./unpkg";
 
@@ -15,12 +11,12 @@ import { esmUnpkgProvider, unpkgProvider } from "./unpkg";
  */
 const ACTIVE_PROVIDERS: readonly MonacoCdnProvider[] = [
   esmProvider,
+  jsdelivrProvider,
+  fastlyProvider,
+  gcoreProvider,
   esmrunProvider,
-  // jsdelivrProvider,
-  // fastlyProvider,
-  // gcoreProvider,
-  // esmUnpkgProvider,
-  // unpkgProvider,
+  esmUnpkgProvider,
+  unpkgProvider,
 ];
 
 export type MonacoSource = string;

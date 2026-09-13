@@ -20,7 +20,7 @@ import { configureYaml } from "./yaml";
 export type { FrpEditorFormat, FrpEditorKind, MonacoSource, MonacoTextEditor };
 export { MONACO_SOURCE_OPTIONS };
 
-let monacoPromise: Promise<LoadedMonaco> | undefined;
+const monacoPromises = new Map<string, Promise<LoadedMonaco>>();
 const schemas = new Map<FrpEditorKind, Record<string, unknown>>();
 const schemaPromises = new Map<
   FrpEditorKind,
@@ -89,6 +89,9 @@ function loadProvider(provider: MonacoCdnProvider): Promise<LoadedMonaco> {
         );
         return yamlModulePromise;
       },
+      loadYamlSyntax: provider.loadYamlSyntax
+        ? () => provider.loadYamlSyntax?.()
+        : undefined,
       style,
     }),
   );
@@ -105,7 +108,8 @@ function loadProvider(provider: MonacoCdnProvider): Promise<LoadedMonaco> {
 }
 
 function loadMonaco(source = "esm"): Promise<LoadedMonaco> {
-  if (monacoPromise) return monacoPromise;
+  const existing = monacoPromises.get(source);
+  if (existing) return existing;
 
   const provider = getProvider(source);
   if (!provider) {
@@ -113,9 +117,9 @@ function loadMonaco(source = "esm"): Promise<LoadedMonaco> {
   }
 
   const promise = loadProvider(provider);
-  monacoPromise = promise;
+  monacoPromises.set(source, promise);
   void promise.catch(() => {
-    if (monacoPromise === promise) monacoPromise = undefined;
+    if (monacoPromises.get(source) === promise) monacoPromises.delete(source);
   });
   return promise;
 }

@@ -64,6 +64,9 @@ export type LoadedMonaco = {
   createJsonWorker: MonacoWorkerFactory;
   createYamlWorker: MonacoWorkerFactory;
   loadYamlModule(): Promise<MonacoYamlModule>;
+  loadYamlSyntax?(): Promise<
+    { conf?: unknown; language?: unknown } | undefined
+  >;
   style: HTMLLinkElement;
 };
 

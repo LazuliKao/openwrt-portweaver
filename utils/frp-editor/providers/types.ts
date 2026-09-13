@@ -33,4 +33,9 @@ export interface MonacoCdnProvider {
 
   /** Dynamically load the monaco-yaml language service module */
   loadYamlModule(): Promise<MonacoYamlModule>;
+
+  /** Optional external loader for YAML Monarch syntax highlighting from upstream */
+  loadYamlSyntax?(): Promise<
+    { conf?: unknown; language?: unknown } | undefined
+  >;
 }

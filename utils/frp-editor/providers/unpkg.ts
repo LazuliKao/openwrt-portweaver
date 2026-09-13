@@ -65,8 +65,13 @@ export const unpkgProvider: MonacoCdnProvider = {
     const jsonModeUrl = `https://unpkg.com/@node-projects/monaco-editor-esm@${MONACO_ESM_VERSION}/esm/vs/languages/features/json/jsonMode.js`;
     return Promise.all([
       importRemoteModule<{ jsonDefaults: MonacoJSONDefaults }>(jsonModuleUrl),
-      importRemoteModule<unknown>(jsonModeUrl),
-    ]).then(([json]) => json.jsonDefaults);
+      importRemoteModule<{
+        setupMode?: (defaults: MonacoJSONDefaults) => void;
+      }>(jsonModeUrl),
+    ]).then(([json, mode]) => {
+      mode?.setupMode?.(json.jsonDefaults);
+      return json.jsonDefaults;
+    });
   },
 
   createEditorWorker(): Worker {
@@ -90,6 +95,12 @@ export const unpkgProvider: MonacoCdnProvider = {
   loadYamlModule() {
     return importRemoteModule(
       `https://unpkg.com/monaco-yaml@${MONACO_YAML_VERSION}?module`,
+    );
+  },
+
+  loadYamlSyntax() {
+    return importRemoteModule<{ conf?: unknown; language?: unknown }>(
+      `https://unpkg.com/@node-projects/monaco-editor-esm@${MONACO_ESM_VERSION}/esm/vs/languages/definitions/yaml/yaml.js`,
     );
   },
 };
