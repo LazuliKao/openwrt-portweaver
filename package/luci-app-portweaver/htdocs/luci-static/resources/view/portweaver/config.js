@@ -1522,7 +1522,7 @@ class FrpExternalConfigEditor_n extends L.form.Value {
     }
     updateSourceControls(e) {
         let t = this.getSession(e);
-        t && (t.fileActions.style.display = this.isFileMode(e) ? "flex" : "none");
+        t && (t.fileActions.style.display = this.isFileMode(e) ? "flex" : "none", t.editor && t.editorFormat !== this.currentFormat(e) && this.startAdvancedEditor(e, t));
     }
     currentFormat(e) {
         return this.editorOptions.getFormat(e);
@@ -1558,21 +1558,33 @@ class FrpExternalConfigEditor_n extends L.form.Value {
             this.setMessage(e, t instanceof Error ? t.message : _("Unable to save configuration file."), "#cf222e");
         })) : this.setMessage(e, _("Enter a configuration file path first."), "#cf222e");
     }
+    startAdvancedEditor(e, t) {
+        var i, o, n;
+        let r = null != (i = null == (o = t.editor) ? void 0 : o.getValue()) ? i : t.textarea.value;
+        null == (n = t.editor) || n.dispose(), t.editor = void 0, t.editorContainer.replaceChildren();
+        let a = this.currentFormat(e), l = ++t.editorRequest;
+        t.editorButton.disabled = !0, this.setMessage(e, t.editorFormat ? _("Updating advanced editor...") : _("Loading advanced editor...")), createFrpConfigEditor(t.editorContainer, ()=>r, (e)=>{
+            t.textarea.value = e;
+        }, this.editorOptions.kind, a).then((i)=>{
+            if (this.getSession(e) !== t || !t.editorContainer.isConnected || t.editorRequest !== l) return void i.dispose();
+            if (this.currentFormat(e) !== a) {
+                i.dispose(), this.startAdvancedEditor(e, t);
+                return;
+            }
+            t.editor = i, t.editorFormat = a, t.textarea.style.display = "none", t.editorContainer.style.display = "block", t.editorButton.style.display = "none", this.setMessage(e, "");
+        }).catch(()=>{
+            this.getSession(e) === t && t.editorRequest === l && (t.editorButton.disabled = !1, t.editorButton.style.display = "", t.textarea.style.display = "", t.editorContainer.style.display = "none", this.setMessage(e, _("Advanced editor could not be loaded; using the plain text editor."), "#c60"));
+        });
+    }
     enableEditor(e) {
         let t = this.getSession(e);
-        t && (t.editorButton.disabled = !0, this.setMessage(e, _("Loading advanced editor...")), createFrpConfigEditor(t.editorContainer, ()=>t.textarea.value, (e)=>{
-            t.textarea.value = e;
-        }, this.editorOptions.kind, this.currentFormat(e)).then((i)=>{
-            this.getSession(e) === t && t.editorContainer.isConnected ? (t.editor = i, t.textarea.style.display = "none", t.editorContainer.style.display = "block", t.editorButton.style.display = "none", this.setMessage(e, "")) : i.dispose();
-        }).catch(()=>{
-            this.getSession(e) === t && (t.editorButton.disabled = !1, this.setMessage(e, _("Advanced editor could not be loaded; using the plain text editor."), "#c60"));
-        }));
+        t && this.startAdvancedEditor(e, t);
     }
     renderWidget(e, s, o) {
         var n;
-        let a = this.sessions.get(e);
-        null == a || a.unsubscribe(), null == a || null == (n = a.editor) || n.dispose();
-        let r = jsx("textarea", {
+        let r = this.sessions.get(e);
+        null == r || r.unsubscribe(), null == r || null == (n = r.editor) || n.dispose();
+        let a = jsx("textarea", {
             class: "cbi-input-text",
             rows: 18,
             spellcheck: !1,
@@ -1597,28 +1609,29 @@ class FrpExternalConfigEditor_n extends L.form.Value {
             type: "button",
             class: "cbi-button cbi-button-save",
             children: _("Save File")
-        }), g = jsx("button", {
+        }), p = jsx("button", {
             type: "button",
             class: "cbi-button cbi-button-apply",
             children: _("Save File & Reload")
-        }), p = jsxs("div", {
+        }), g = jsxs("div", {
             style: "display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;",
             children: [
                 c,
                 h,
-                g
+                p
             ]
         }), f = jsx("div", {
             style: "min-height:1.2em; margin-top:0.75em;"
-        }), b = {
-            textarea: r,
+        }), v = {
+            textarea: a,
             editorContainer: l,
             editorButton: d,
-            fileActions: p,
+            editorRequest: 0,
+            fileActions: g,
             message: f,
             unsubscribe: ()=>{}
         };
-        return b.unsubscribe = this.editorOptions.subscribeSourceChanges(e, ()=>this.updateSourceControls(e)), this.sessions.set(e, b), this.updateSourceControls(e), d.onclick = ()=>this.enableEditor(e), c.onclick = ()=>this.loadFile(e), u.onclick = ()=>this.validateContent(e), h.onclick = ()=>this.saveFile(e, !1), g.onclick = ()=>this.saveFile(e, !0), jsxs("div", {
+        return v.unsubscribe = this.editorOptions.subscribeSourceChanges(e, ()=>this.updateSourceControls(e)), this.sessions.set(e, v), this.updateSourceControls(e), d.onclick = ()=>this.enableEditor(e), c.onclick = ()=>this.loadFile(e), u.onclick = ()=>this.validateContent(e), h.onclick = ()=>this.saveFile(e, !1), p.onclick = ()=>this.saveFile(e, !0), jsxs("div", {
             class: "cbi-value-field",
             children: [
                 jsx("p", {
@@ -1629,13 +1642,13 @@ class FrpExternalConfigEditor_n extends L.form.Value {
                     style: "margin-bottom:0.75em;",
                     children: d
                 }),
-                r,
+                a,
                 l,
                 jsx("div", {
                     style: "display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;",
                     children: u
                 }),
-                p,
+                g,
                 f
             ]
         });

@@ -21,6 +21,8 @@ type EditorOptions = {
 type EditorSession = {
   textarea: HTMLTextAreaElement;
   editor?: MonacoTextEditor;
+  editorFormat?: FrpEditorFormat;
+  editorRequest: number;
   editorContainer: HTMLElement;
   editorButton: HTMLButtonElement;
   fileActions: HTMLElement;
@@ -62,6 +64,12 @@ class FrpExternalConfigEditor extends L.form.Value {
     session.fileActions.style.display = this.isFileMode(sectionId)
       ? "flex"
       : "none";
+    if (
+      session.editor &&
+      session.editorFormat !== this.currentFormat(sectionId)
+    ) {
+      this.startAdvancedEditor(sectionId, session);
+    }
   }
 
   private currentFormat(sectionId: string): FrpEditorFormat {
@@ -190,37 +198,61 @@ class FrpExternalConfigEditor extends L.form.Value {
       });
   }
 
-  private enableEditor(sectionId: string): void {
-    const session = this.getSession(sectionId);
-    if (!session) return;
+  private startAdvancedEditor(sectionId: string, session: EditorSession): void {
+    const value = session.editor?.getValue() ?? session.textarea.value;
+    session.editor?.dispose();
+    session.editor = undefined;
+    session.editorContainer.replaceChildren();
+
+    const format = this.currentFormat(sectionId);
+    const request = ++session.editorRequest;
     session.editorButton.disabled = true;
-    this.setMessage(sectionId, _("Loading advanced editor..."));
+    this.setMessage(
+      sectionId,
+      session.editorFormat
+        ? _("Updating advanced editor...")
+        : _("Loading advanced editor..."),
+    );
     void createFrpConfigEditor(
       session.editorContainer,
-      () => session.textarea.value,
+      () => value,
       (value) => {
         session.textarea.value = value;
       },
       this.editorOptions.kind,
-      this.currentFormat(sectionId),
+      format,
     )
       .then((editor) => {
         if (
           this.getSession(sectionId) !== session ||
-          !session.editorContainer.isConnected
+          !session.editorContainer.isConnected ||
+          session.editorRequest !== request
         ) {
           editor.dispose();
           return;
         }
+        if (this.currentFormat(sectionId) !== format) {
+          editor.dispose();
+          this.startAdvancedEditor(sectionId, session);
+          return;
+        }
         session.editor = editor;
+        session.editorFormat = format;
         session.textarea.style.display = "none";
         session.editorContainer.style.display = "block";
         session.editorButton.style.display = "none";
         this.setMessage(sectionId, "");
       })
       .catch(() => {
-        if (this.getSession(sectionId) !== session) return;
+        if (
+          this.getSession(sectionId) !== session ||
+          session.editorRequest !== request
+        )
+          return;
         session.editorButton.disabled = false;
+        session.editorButton.style.display = "";
+        session.textarea.style.display = "";
+        session.editorContainer.style.display = "none";
         this.setMessage(
           sectionId,
           _(
@@ -229,6 +261,12 @@ class FrpExternalConfigEditor extends L.form.Value {
           "#c60",
         );
       });
+  }
+
+  private enableEditor(sectionId: string): void {
+    const session = this.getSession(sectionId);
+    if (!session) return;
+    this.startAdvancedEditor(sectionId, session);
   }
 
   renderWidget(sectionId: string, _optionIndex: number, cfgvalue: string) {
@@ -289,6 +327,7 @@ class FrpExternalConfigEditor extends L.form.Value {
       textarea,
       editorContainer,
       editorButton,
+      editorRequest: 0,
       fileActions,
       message,
       unsubscribe: () => {},
