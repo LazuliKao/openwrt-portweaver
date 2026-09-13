@@ -1,9 +1,8 @@
 import { LogViewerDialog } from "@/components/LogViewerDialog";
-import { addFrpConfigSource } from "@/components/FrpConfigSource";
+import { addFrpNodeConfigSource } from "@/components/FrpConfigSource";
 import { rpcClient } from "@/utils/rpc-client";
 import { getThemeColors } from "@/utils/theme-utils";
 const form = L.form;
-const EXTERNAL_SERVER_NAME = "__external_frps__";
 
 type FrpsState =
   | "running"
@@ -50,8 +49,6 @@ export default function (
   s: LuCI.form.NamedSection,
   tab_id: string,
 ) {
-  addFrpConfigSource(s, tab_id, "frps");
-
   const o = s.taboption(
     tab_id,
     form.SectionValue,
@@ -59,78 +56,13 @@ export default function (
     form.GridSection,
     "frps_node",
   );
-  o.depends("frps_config_mode", "builtin");
-
   const ss = o.subsection as LuCI.form.GridSection;
   ss.anonymous = true;
   ss.addremove = true;
   ss.sortable = true;
   ss.cloneable = true;
 
-  {
-    const o = s.taboption(
-      tab_id,
-      form.DummyValue,
-      "_frps_external_status",
-      _("External FRPS Status"),
-    );
-    o.depends("frps_config_mode", "external_file");
-    o.depends("frps_config_mode", "external_uci");
-    o.textvalue = () => {
-      const info = nodeStatuses[EXTERNAL_SERVER_NAME] || {
-        status: "unavailable" as FrpsState,
-      };
-      const colors = getStatusColors();
-      const status = info.status || "unavailable";
-      const container = (
-        <span style="display:flex; align-items:center;">
-          <span
-            style={`display:inline-block; width:12px; height:12px; border-radius:50%; background-color:${colors[status]}; margin-right:8px;`}
-          ></span>
-          <span>{STATUS_LABELS[status]}</span>
-        </span>
-      ) as HTMLElement;
-      statusElements[EXTERNAL_SERVER_NAME] = container;
-      return container;
-    };
-  }
-
-  {
-    const o = s.taboption(
-      tab_id,
-      form.DummyValue,
-      "_frps_external_logs",
-      _("External FRPS Logs"),
-    );
-    o.depends("frps_config_mode", "external_file");
-    o.depends("frps_config_mode", "external_uci");
-    o.textvalue = () => {
-      const isRunning =
-        (nodeStatuses[EXTERNAL_SERVER_NAME]?.status || "stopped") !== "stopped";
-      const btn = (
-        <button
-          type="button"
-          class="cbi-button cbi-button-action"
-          onclick={() => {
-            const logViewer = new LogViewerDialog({
-              name: EXTERNAL_SERVER_NAME,
-              title: _("External FRPS Logs"),
-              fetcher: async () =>
-                await rpcClient.getFrpsInfo(EXTERNAL_SERVER_NAME),
-              clearer: async () =>
-                await rpcClient.clearFrpsLogs(EXTERNAL_SERVER_NAME),
-            });
-            logViewer.open();
-          }}
-          disabled={!isRunning}
-        >
-          {_("View Logs")}
-        </button>
-      ) as HTMLButtonElement;
-      actionButtons[EXTERNAL_SERVER_NAME] = btn;
-      return btn;
-    };
-  }
+  addFrpNodeConfigSource(ss, "frps");
 
   ss.sectiontitle = (section_id: string): string =>
     (L.uci.get("portweaver", section_id, "name") as string) ||
@@ -217,6 +149,7 @@ export default function (
     o.rmempty = false;
     o.datatype = "port";
     o.placeholder = "7000";
+    o.depends("config_mode", "builtin");
     o.validate = (_section_id: string, value: unknown) => {
       const val = String(value || "");
       if (!val || val.trim() === "") return _("Bind port is required");
@@ -234,6 +167,7 @@ export default function (
     o.datatype = "host";
     o.placeholder = "0.0.0.0";
     o.default = "0.0.0.0";
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -242,6 +176,7 @@ export default function (
     o.password = true;
     o.rmempty = true;
     o.placeholder = "optional token for authentication";
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -252,6 +187,7 @@ export default function (
     o.description = _(
       "Port range or list of ports that clients can use. e.g., '10000-20000' or '8080,8081,8082'",
     );
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -260,6 +196,7 @@ export default function (
     o.rmempty = true;
     o.default = "1";
     o.description = _("Enable TCP multiplexing for better performance");
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -269,6 +206,7 @@ export default function (
     o.datatype = "uinteger";
     o.placeholder = "5";
     o.description = _("Maximum connection pool size per proxy");
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -282,6 +220,7 @@ export default function (
     o.datatype = "uinteger";
     o.placeholder = "0";
     o.description = _("Maximum number of ports per client (0 = unlimited)");
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -294,6 +233,7 @@ export default function (
     o.value("info", "Info");
     o.value("warn", "Warning");
     o.value("error", "Error");
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -303,6 +243,7 @@ export default function (
     o.datatype = "host";
     o.placeholder = "0.0.0.0";
     o.default = "0.0.0.0";
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -318,6 +259,7 @@ export default function (
         return _("Port must be between 1 and 65535");
       return true;
     };
+    o.depends("config_mode", "builtin");
   }
 
   {
@@ -325,7 +267,7 @@ export default function (
     o.modalonly = true;
     o.rmempty = true;
     o.placeholder = "admin";
-    o.depends("dashboard_port", /\S+/);
+    o.depends({ config_mode: "builtin", dashboard_port: /\S+/ });
   }
 
   {
@@ -334,7 +276,7 @@ export default function (
     o.password = true;
     o.rmempty = true;
     o.placeholder = "admin";
-    o.depends("dashboard_port", /\S+/);
+    o.depends({ config_mode: "builtin", dashboard_port: /\S+/ });
   }
 
   {
@@ -375,18 +317,12 @@ export default function (
 
   async function pollFrpsStatus() {
     try {
-      const mode =
-        (L.uci.get("portweaver", "global", "frps_config_mode") as string) ||
-        "builtin";
-      const nodes =
-        mode === "builtin"
-          ? (await L.uci.sections("portweaver", "frps_node")).map(
-              (sec: any) => ({
-                key: sec[".name"] as string,
-                name: sec.name as string,
-              }),
-            )
-          : [{ key: EXTERNAL_SERVER_NAME, name: EXTERNAL_SERVER_NAME }];
+      const nodes = (await L.uci.sections("portweaver", "frps_node")).map(
+        (sec: any) => ({
+          key: sec[".name"] as string,
+          name: sec.name as string,
+        }),
+      );
       const promises = nodes.map((node) => {
         const nodeName = node.name;
 

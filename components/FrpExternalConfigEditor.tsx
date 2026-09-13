@@ -14,28 +14,40 @@ type EditorOptions = {
   getPath: (sectionId: string) => string;
 };
 
+type EditorSession = {
+  textarea: HTMLTextAreaElement;
+  editor?: MonacoTextEditor;
+  editorContainer: HTMLElement;
+  editorButton: HTMLButtonElement;
+  message: HTMLElement;
+};
+
 class FrpExternalConfigEditor extends L.form.Value {
-  private textarea?: HTMLTextAreaElement;
-  private editor?: MonacoTextEditor;
-  private editorContainer?: HTMLElement;
-  private editorButton?: HTMLButtonElement;
-  private message?: HTMLElement;
+  private sessions = new Map<string, EditorSession>();
 
   protected readonly editorOptions!: EditorOptions;
 
-  private getValue(): string {
-    return this.editor?.getValue() ?? this.textarea?.value ?? "";
+  private getSession(sectionId: string): EditorSession | undefined {
+    return this.sessions.get(sectionId);
   }
 
-  private setValue(value: string): void {
-    if (this.textarea) this.textarea.value = value;
-    this.editor?.setValue(value);
+  private getValue(sectionId: string): string {
+    const session = this.getSession(sectionId);
+    return session?.editor?.getValue() ?? session?.textarea.value ?? "";
   }
 
-  private setMessage(message: string, color = ""): void {
-    if (!this.message) return;
-    this.message.style.color = color;
-    this.message.textContent = message;
+  private setValue(sectionId: string, value: string): void {
+    const session = this.getSession(sectionId);
+    if (!session) return;
+    session.textarea.value = value;
+    session.editor?.setValue(value);
+  }
+
+  private setMessage(sectionId: string, message: string, color = ""): void {
+    const session = this.getSession(sectionId);
+    if (!session) return;
+    session.message.style.color = color;
+    session.message.textContent = message;
   }
 
   private currentFormat(sectionId: string): FrpEditorFormat {
@@ -47,20 +59,21 @@ class FrpExternalConfigEditor extends L.form.Value {
   }
 
   private validateContent(sectionId: string): void {
-    this.setMessage(_("Validating configuration..."));
+    this.setMessage(sectionId, _("Validating configuration..."));
     void rpcClient
       .validateFrpConfig(
         this.editorOptions.kind,
         this.currentFormat(sectionId),
-        this.getValue(),
+        this.getValue(sectionId),
       )
       .then((response) => {
         if (!response?.success)
           throw new Error(response?.error || _("Configuration is invalid."));
-        this.setMessage(_("Configuration is valid."), "#1a7f37");
+        this.setMessage(sectionId, _("Configuration is valid."), "#1a7f37");
       })
       .catch((error: unknown) => {
         this.setMessage(
+          sectionId,
           error instanceof Error
             ? error.message
             : _("Configuration validation failed."),
@@ -72,6 +85,7 @@ class FrpExternalConfigEditor extends L.form.Value {
   private loadFile(sectionId: string): void {
     if (!this.isFileMode(sectionId)) {
       this.setMessage(
+        sectionId,
         _("File actions are available only for the External File source."),
         "#c60",
       );
@@ -79,10 +93,14 @@ class FrpExternalConfigEditor extends L.form.Value {
     }
     const path = this.editorOptions.getPath(sectionId).trim();
     if (!path) {
-      this.setMessage(_("Enter a configuration file path first."), "#cf222e");
+      this.setMessage(
+        sectionId,
+        _("Enter a configuration file path first."),
+        "#cf222e",
+      );
       return;
     }
-    this.setMessage(_("Loading configuration file..."));
+    this.setMessage(sectionId, _("Loading configuration file..."));
     void rpcClient
       .readFrpConfig(this.editorOptions.kind, path)
       .then((response) => {
@@ -90,11 +108,12 @@ class FrpExternalConfigEditor extends L.form.Value {
           throw new Error(
             response?.error || _("Unable to load configuration file."),
           );
-        this.setValue(response.content || "");
-        this.setMessage(_("Configuration file loaded."), "#1a7f37");
+        this.setValue(sectionId, response.content || "");
+        this.setMessage(sectionId, _("Configuration file loaded."), "#1a7f37");
       })
       .catch((error: unknown) => {
         this.setMessage(
+          sectionId,
           error instanceof Error
             ? error.message
             : _("Unable to load configuration file."),
@@ -106,6 +125,7 @@ class FrpExternalConfigEditor extends L.form.Value {
   private saveFile(sectionId: string, reload: boolean): void {
     if (!this.isFileMode(sectionId)) {
       this.setMessage(
+        sectionId,
         _("File actions are available only for the External File source."),
         "#c60",
       );
@@ -113,10 +133,15 @@ class FrpExternalConfigEditor extends L.form.Value {
     }
     const path = this.editorOptions.getPath(sectionId).trim();
     if (!path) {
-      this.setMessage(_("Enter a configuration file path first."), "#cf222e");
+      this.setMessage(
+        sectionId,
+        _("Enter a configuration file path first."),
+        "#cf222e",
+      );
       return;
     }
     this.setMessage(
+      sectionId,
       reload ? _("Saving and reloading...") : _("Saving configuration file..."),
     );
     void rpcClient
@@ -124,7 +149,7 @@ class FrpExternalConfigEditor extends L.form.Value {
         this.editorOptions.kind,
         this.currentFormat(sectionId),
         path,
-        this.getValue(),
+        this.getValue(sectionId),
         reload,
       )
       .then((response) => {
@@ -133,6 +158,7 @@ class FrpExternalConfigEditor extends L.form.Value {
             response?.error || _("Unable to save configuration file."),
           );
         this.setMessage(
+          sectionId,
           reload
             ? _("Configuration file saved and reload requested.")
             : _("Configuration file saved."),
@@ -141,6 +167,7 @@ class FrpExternalConfigEditor extends L.form.Value {
       })
       .catch((error: unknown) => {
         this.setMessage(
+          sectionId,
           error instanceof Error
             ? error.message
             : _("Unable to save configuration file."),
@@ -150,32 +177,38 @@ class FrpExternalConfigEditor extends L.form.Value {
   }
 
   private enableEditor(sectionId: string): void {
-    if (!this.editorButton || !this.editorContainer || !this.textarea) return;
-    this.editorButton.disabled = true;
-    this.setMessage(_("Loading advanced editor..."));
+    const session = this.getSession(sectionId);
+    if (!session) return;
+    session.editorButton.disabled = true;
+    this.setMessage(sectionId, _("Loading advanced editor..."));
     void createFrpConfigEditor(
-      this.editorContainer,
-      () => this.textarea?.value || "",
+      session.editorContainer,
+      () => session.textarea.value,
       (value) => {
-        if (this.textarea) this.textarea.value = value;
+        session.textarea.value = value;
       },
       this.editorOptions.kind,
       this.currentFormat(sectionId),
     )
       .then((editor) => {
-        if (!this.editorContainer?.isConnected) {
+        if (
+          this.getSession(sectionId) !== session ||
+          !session.editorContainer.isConnected
+        ) {
           editor.dispose();
           return;
         }
-        this.editor = editor;
-        if (this.textarea) this.textarea.style.display = "none";
-        if (this.editorContainer) this.editorContainer.style.display = "block";
-        if (this.editorButton) this.editorButton.style.display = "none";
-        this.setMessage("");
+        session.editor = editor;
+        session.textarea.style.display = "none";
+        session.editorContainer.style.display = "block";
+        session.editorButton.style.display = "none";
+        this.setMessage(sectionId, "");
       })
       .catch(() => {
-        if (this.editorButton) this.editorButton.disabled = false;
+        if (this.getSession(sectionId) !== session) return;
+        session.editorButton.disabled = false;
         this.setMessage(
+          sectionId,
           _(
             "Advanced editor could not be loaded; using the plain text editor.",
           ),
@@ -185,6 +218,7 @@ class FrpExternalConfigEditor extends L.form.Value {
   }
 
   renderWidget(sectionId: string, _optionIndex: number, cfgvalue: string) {
+    this.sessions.get(sectionId)?.editor?.dispose();
     const textarea = (
       <textarea
         class="cbi-input-text"
@@ -228,10 +262,12 @@ class FrpExternalConfigEditor extends L.form.Value {
       <div style="min-height:1.2em; margin-top:0.75em;"></div>
     ) as HTMLElement;
 
-    this.textarea = textarea;
-    this.editorContainer = editorContainer;
-    this.editorButton = editorButton;
-    this.message = message;
+    this.sessions.set(sectionId, {
+      textarea,
+      editorContainer,
+      editorButton,
+      message,
+    });
     editorButton.onclick = () => this.enableEditor(sectionId);
     loadButton.onclick = () => this.loadFile(sectionId);
     validateButton.onclick = () => this.validateContent(sectionId);
@@ -259,8 +295,8 @@ class FrpExternalConfigEditor extends L.form.Value {
     );
   }
 
-  formvalue(_sectionId: string): string {
-    return this.getValue();
+  formvalue(sectionId: string): string {
+    return this.getValue(sectionId);
   }
 
   write(sectionId: string, formvalue: string): null {
