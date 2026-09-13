@@ -1356,78 +1356,234 @@ class LogViewerDialog {
 let monaco_e;
 
 
-let monaco_r = "0.56.0", monaco_n = "bf8926da67eb09d5508e3403e3d538a90e66e739", monaco_a = {
-    frpc: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(monaco_n, "/frpc-schema.json"),
-    frps: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(monaco_n, "/frps-schema.json")
-}, monaco_s = new Map(), monaco_i = new Set();
-async function createFrpConfigEditor(n, c, l, m, d) {
-    let p, [u, h] = await Promise.all([
-        function() {
-            var n, a;
-            if (monaco_e) return monaco_e;
-            let s = (a = Promise.all([
-                (n = "https://esm.sh/monaco-editor@".concat(monaco_r, "?bundle"), Function("url", "return import(url);")(n)),
-                new Promise((e, t)=>{
-                    let o = document.createElement("link");
-                    o.rel = "stylesheet", o.href = "https://esm.sh/monaco-editor@".concat(monaco_r, "/min/vs/editor/editor.main.css"), o.onload = ()=>e(), o.onerror = ()=>{
-                        o.remove(), t(Error("Unable to load advanced editor styles."));
-                    }, document.head.appendChild(o);
-                })
+let monaco_r = "0.56.0", monaco_n = "0.56.1", monaco_a = "bf8926da67eb09d5508e3403e3d538a90e66e739", monaco_s = {
+    frpc: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(monaco_a, "/frpc-schema.json"),
+    frps: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(monaco_a, "/frps-schema.json")
+};
+const MONACO_SOURCE_OPTIONS = [
+    {
+        value: "auto",
+        label: _("Automatic (test all CDNs and use the fastest)")
+    },
+    {
+        value: "esm",
+        label: "esm.sh"
+    },
+    {
+        value: "jsdelivr",
+        label: "jsDelivr"
+    },
+    {
+        value: "fastly",
+        label: "jsDelivr (Fastly)"
+    },
+    {
+        value: "gcore",
+        label: "jsDelivr (Gcore)"
+    },
+    {
+        value: "unpkg",
+        label: "unpkg"
+    }
+];
+let monaco_l = new Map(), monaco_i = new Map(), monaco_c = new Set(), monaco_u = [
+    {
+        id: "esm",
+        name: "esm.sh",
+        moduleUrl: "https://esm.sh/monaco-editor@".concat(monaco_r, "?bundle"),
+        probeUrls: [
+            "https://esm.sh/monaco-editor@".concat(monaco_r, "/es2022/monaco-editor.bundle.mjs")
+        ],
+        editorWorkerUrl: "https://esm.sh/monaco-editor@".concat(monaco_r, "/esm/vs/editor/editor.worker.js"),
+        jsonWorkerUrl: "https://esm.sh/monaco-editor@".concat(monaco_r, "/esm/vs/language/json/json.worker.js"),
+        styleUrl: "https://esm.sh/monaco-editor@".concat(monaco_r, "/min/vs/editor/editor.main.css")
+    },
+    ...[
+        [
+            "jsdelivr",
+            "jsDelivr",
+            "https://cdn.jsdelivr.net/npm/@node-projects/monaco-editor-esm"
+        ],
+        [
+            "fastly",
+            "jsDelivr (Fastly)",
+            "https://fastly.jsdelivr.net/npm/@node-projects/monaco-editor-esm"
+        ],
+        [
+            "gcore",
+            "jsDelivr (Gcore)",
+            "https://gcore.jsdelivr.net/npm/@node-projects/monaco-editor-esm"
+        ],
+        [
+            "unpkg",
+            "unpkg",
+            "https://unpkg.com/@node-projects/monaco-editor-esm"
+        ]
+    ].map((e)=>{
+        let [t, o, r] = e;
+        return {
+            id: t,
+            name: o,
+            moduleUrl: "".concat(r, "@").concat(monaco_n, "/esm/vs/editor/editor.api.js"),
+            jsonModuleUrl: "".concat(r, "@").concat(monaco_n, "/esm/vs/languages/features/json/register.js"),
+            jsonModeUrl: "".concat(r, "@").concat(monaco_n, "/esm/vs/languages/features/json/jsonMode.js"),
+            editorWorkerUrl: "".concat(r, "@").concat(monaco_n, "/esm/vs/editor/editor.worker.js"),
+            jsonWorkerUrl: "".concat(r, "@").concat(monaco_n, "/esm/vs/language/json/json.worker.js"),
+            styleUrl: "".concat(r, "@").concat(monaco_n, "/min/vs/editor/editor.main.css")
+        };
+    })
+];
+function monaco_m(e) {
+    let t = new Blob([
+        "import ".concat(JSON.stringify(e), ";")
+    ], {
+        type: "application/javascript"
+    }), o = URL.createObjectURL(t);
+    try {
+        return new Worker(o, {
+            type: "module"
+        });
+    } finally{
+        URL.revokeObjectURL(o);
+    }
+}
+function monaco_d(e) {
+    return Function("url", "return import(url);")(e);
+}
+async function monaco_p(e) {
+    let t = new AbortController(), o = window.setTimeout(()=>t.abort(), 15000), r = performance.now();
+    try {
+        var n;
+        let o = (null != (n = e.probeUrls) ? n : [
+            e.moduleUrl,
+            e.jsonModuleUrl,
+            e.jsonModeUrl
+        ]).filter((e)=>!!e), a = await Promise.all(o.map((e)=>fetch(e, {
+                signal: t.signal
+            })));
+        if (a.some((e)=>!e.ok)) throw Error("Monaco CDN probe failed.");
+        return await Promise.all(a.map((e)=>e.arrayBuffer())), performance.now() - r;
+    } finally{
+        window.clearTimeout(o);
+    }
+}
+async function monaco_h() {
+    return (await Promise.all(monaco_u.map(async (e, t)=>{
+        try {
+            return {
+                candidate: e,
+                duration: await monaco_p(e),
+                index: t
+            };
+        } catch (o) {
+            return {
+                candidate: e,
+                duration: 1 / 0,
+                index: t
+            };
+        }
+    }))).sort((e, t)=>e.duration - t.duration || e.index - t.index).map((e)=>{
+        let { candidate: t } = e;
+        return t;
+    });
+}
+async function monaco_f(e) {
+    let t;
+    for (let o of e)try {
+        return await function(e) {
+            var t, o;
+            let r = (t = e.styleUrl, new Promise((e, o)=>{
+                let r = document.createElement("link");
+                r.rel = "stylesheet", r.href = t, r.onload = ()=>e(r), r.onerror = ()=>{
+                    r.remove(), o(Error("Unable to load Monaco stylesheet from ".concat(t, ".")));
+                }, document.head.appendChild(r);
+            })), n = monaco_d(e.moduleUrl), a = e.jsonModuleUrl && e.jsonModeUrl ? Promise.all([
+                monaco_d(e.jsonModuleUrl),
+                monaco_d(e.jsonModeUrl)
             ]).then((e)=>{
-                let [n] = e, a = globalThis;
-                return a.MonacoEnvironment = _object_spread_props(_object_spread({}, a.MonacoEnvironment), {
-                    getWorker: (e, t)=>(function(e) {
-                            let t = new Blob([
-                                "import ".concat(JSON.stringify(e), ";")
-                            ], {
-                                type: "application/javascript"
-                            }), o = URL.createObjectURL(t);
-                            try {
-                                return new Worker(o, {
-                                    type: "module"
-                                });
-                            } finally{
-                                URL.revokeObjectURL(o);
-                            }
-                        })("json" === t ? "https://esm.sh/monaco-editor@".concat(monaco_r, "/esm/vs/language/json/json.worker.js") : "https://esm.sh/monaco-editor@".concat(monaco_r, "/esm/vs/editor/editor.worker.js"))
-                }), n;
+                let [t] = e;
+                return t.jsonDefaults;
+            }) : n.then((e)=>{
+                var t;
+                if (!(null == (t = e.json) ? void 0 : t.jsonDefaults)) throw Error("Monaco JSON support is unavailable.");
+                return e.json.jsonDefaults;
+            });
+            return (o = Promise.all([
+                n,
+                a,
+                r
+            ]).then((t)=>{
+                let [o, r, n] = t;
+                return {
+                    monaco: o,
+                    jsonDefaults: r,
+                    createEditorWorker: ()=>monaco_m(e.editorWorkerUrl),
+                    createJsonWorker: ()=>monaco_m(e.jsonWorkerUrl),
+                    style: n
+                };
             }), new Promise((e, t)=>{
-                let o = window.setTimeout(()=>t(Error("Advanced editor loading timed out.")), 15000);
-                a.then((t)=>{
-                    window.clearTimeout(o), e(t);
+                let r = window.setTimeout(()=>t(Error("Monaco CDN request timed out.")), 15000);
+                o.then((t)=>{
+                    window.clearTimeout(r), e(t);
                 }, (e)=>{
-                    window.clearTimeout(o), t(e);
+                    window.clearTimeout(r), t(e);
                 });
-            }));
-            return monaco_e = s, s.catch(()=>{
-                monaco_e === s && (monaco_e = void 0);
-            }), s;
-        }(),
-        (p = monaco_s.get(m)) ? Promise.resolve(p) : fetch(monaco_a[m]).then((e)=>{
-            if (!e.ok) throw Error("Unable to load the FRP schema.");
-            return e.json();
-        }).then((e)=>(monaco_s.set(m, e), e))
-    ]), g = u.Uri.parse("inmemory://portweaver/".concat(m, ".").concat(d));
-    "json" === d && u.json ? u.json.jsonDefaults.setDiagnosticsOptions({
+            })).catch((t)=>{
+                throw r.then((e)=>e.remove(), ()=>void 0), Error("Unable to load Monaco from ".concat(e.name, "."), {
+                    cause: t
+                });
+            });
+        }(o);
+    } catch (e) {
+        t = e;
+    }
+    throw null != t ? t : Error("Unable to load Monaco from any CDN.");
+}
+async function createFrpConfigEditor(r, n, a, m, d) {
+    let p = arguments.length > 5 && void 0 !== arguments[5] ? arguments[5] : "auto", [g, j] = await Promise.all([
+        function(r) {
+            if (monaco_e) return monaco_e;
+            let n = ("auto" === r ? monaco_h() : Promise.resolve(monaco_u.filter((e)=>e.id === r))).then((e)=>monaco_f(e).then((e)=>{
+                    var r, n;
+                    let a, s;
+                    return r = e.createEditorWorker, n = e.createJsonWorker, s = (a = globalThis).MonacoEnvironment, a.MonacoEnvironment = _object_spread_props(_object_spread({}, s), {
+                        getWorker: (e, t)=>(null == s ? void 0 : s.getWorker) ? s.getWorker(e, t) : ("json" === t ? n : r)()
+                    }), e;
+                }));
+            return monaco_e = n, n.catch(()=>{
+                monaco_e === n && (monaco_e = void 0);
+            }), n;
+        }(p),
+        function(e) {
+            let t = monaco_i.get(e);
+            if (t) return t;
+            let o = fetch(monaco_s[e]).then((e)=>{
+                if (!e.ok) throw Error("Unable to load the FRP schema.");
+                return e.json();
+            }).then((t)=>(monaco_l.set(e, t), t)).catch(()=>void 0);
+            return monaco_i.set(e, o), o;
+        }(m)
+    ]), { monaco: v, jsonDefaults: b } = g, w = v.Uri.parse("inmemory://portweaver/".concat(m, ".").concat(d));
+    "json" === d ? b.setDiagnosticsOptions({
         allowComments: !1,
         enableSchemaRequest: !1,
-        schemas: [
-            ...monaco_s.entries()
+        schemas: j ? [
+            ...monaco_l.entries()
         ].map((e)=>{
             let [t, o] = e;
             return {
-                uri: monaco_a[t],
                 fileMatch: [
                     "inmemory://portweaver/".concat(t, ".json")
                 ],
-                schema: o
+                schema: o,
+                uri: monaco_s[t]
             };
-        }),
+        }) : [],
         validate: !0
-    }) : "json" !== d && function(e, t, o) {
+    }) : j && function(e, t, o) {
         let r = "".concat(t, ":").concat(String(o.$id || "frp"));
-        if (monaco_i.has(r)) return;
-        monaco_i.add(r), monaco_i.has(t) || (monaco_i.add(t), e.languages.register({
+        if (monaco_c.has(r)) return;
+        monaco_c.add(r), monaco_c.has(t) || (monaco_c.add(t), e.languages.register({
             id: t
         }), e.languages.setMonarchTokensProvider(t, {
             tokenizer: {
@@ -1461,38 +1617,57 @@ async function createFrpConfigEditor(n, c, l, m, d) {
                 ".",
                 "-"
             ],
-            provideCompletionItems: ()=>({
+            provideCompletionItems: (o, r)=>({
                     suggestions: Object.entries(n).map((o)=>{
-                        var r, n;
-                        let [a, s] = o;
+                        var n, a;
+                        let [s, l] = o;
                         return {
-                            label: a,
+                            label: s,
                             kind: e.languages.CompletionItemKind.Property,
-                            documentation: s.description || "FRP configuration option",
-                            insertText: "toml" === t ? "".concat(a, " = ").concat(JSON.stringify(null != (r = s.default) ? r : "")) : "".concat(a, ": ").concat(JSON.stringify(null != (n = s.default) ? n : "")),
-                            insertTextRules: e.languages.CompletionItemInsertTextRule.InsertAsSnippet
+                            documentation: l.description || "FRP configuration option",
+                            insertText: "toml" === t ? "".concat(s, " = ").concat(JSON.stringify(null != (n = l.default) ? n : "")) : "".concat(s, ": ").concat(JSON.stringify(null != (a = l.default) ? a : "")),
+                            insertTextRules: e.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                            range: {
+                                startLineNumber: r.lineNumber,
+                                endLineNumber: r.lineNumber,
+                                startColumn: r.column,
+                                endColumn: r.column
+                            }
                         };
                     })
                 })
         });
-    }(u, d, h);
-    let f = u.editor.createModel(c(), d, g);
-    u.editor.setTheme(matchMedia("(prefers-color-scheme: dark)").matches ? "vs-dark" : "vs");
-    let w = u.editor.create(n, {
+    }(v, d, j);
+    let y = v.editor.createModel(n(), d, w);
+    v.editor.setTheme(!function() {
+        for (let e of [
+            document.body,
+            document.documentElement
+        ]){
+            let t = function(e) {
+                var t;
+                let o = null == (t = getComputedStyle(e).backgroundColor.match(/\d+/g)) ? void 0 : t.map(Number);
+                if (o && !(o.length < 3) && 0 !== o[3]) return 0.299 * o[0] + 0.587 * o[1] + 0.114 * o[2];
+            }(e);
+            if (void 0 !== t) return t < 128;
+        }
+        return matchMedia("(prefers-color-scheme: dark)").matches;
+    }() ? "vs" : "vs-dark");
+    let k = v.editor.create(r, {
         automaticLayout: !0,
         minimap: {
             enabled: !1
         },
-        model: f,
+        model: y,
         scrollBeyondLastLine: !1,
         tabSize: 2,
         wordWrap: "on"
-    }), b = f.onDidChangeContent(()=>l(f.getValue()));
+    }), U = y.onDidChangeContent(()=>a(y.getValue()));
     return {
-        getValue: ()=>f.getValue(),
-        setValue: (e)=>f.setValue(e),
+        getValue: ()=>y.getValue(),
+        setValue: (e)=>y.setValue(e),
         dispose: ()=>{
-            b.dispose(), w.dispose(), f.dispose();
+            U.dispose(), k.dispose(), y.dispose();
         }
     };
 }
@@ -1559,97 +1734,112 @@ class FrpExternalConfigEditor_n extends L.form.Value {
         })) : this.setMessage(e, _("Enter a configuration file path first."), "#cf222e");
     }
     startAdvancedEditor(e, t) {
-        var i, o, n;
-        let r = null != (i = null == (o = t.editor) ? void 0 : o.getValue()) ? i : t.textarea.value;
-        null == (n = t.editor) || n.dispose(), t.editor = void 0, t.editorContainer.replaceChildren();
-        let a = this.currentFormat(e), l = ++t.editorRequest;
-        t.editorButton.disabled = !0, this.setMessage(e, t.editorFormat ? _("Updating advanced editor...") : _("Loading advanced editor...")), createFrpConfigEditor(t.editorContainer, ()=>r, (e)=>{
+        var i, o, r;
+        let n = null != (i = null == (o = t.editor) ? void 0 : o.getValue()) ? i : t.textarea.value;
+        null == (r = t.editor) || r.dispose(), t.editor = void 0, t.editorContainer.replaceChildren();
+        let a = this.currentFormat(e), l = t.editorSource.value, d = ++t.editorRequest;
+        t.editorButton.disabled = !0, t.editorSource.disabled = !0, this.setMessage(e, t.editorFormat ? _("Updating advanced editor...") : _("Loading advanced editor...")), createFrpConfigEditor(t.editorContainer, ()=>n, (e)=>{
             t.textarea.value = e;
-        }, this.editorOptions.kind, a).then((i)=>{
-            if (this.getSession(e) !== t || !t.editorContainer.isConnected || t.editorRequest !== l) return void i.dispose();
+        }, this.editorOptions.kind, a, l).then((i)=>{
+            if (this.getSession(e) !== t || !t.editorContainer.isConnected || t.editorRequest !== d) return void i.dispose();
             if (this.currentFormat(e) !== a) {
                 i.dispose(), this.startAdvancedEditor(e, t);
                 return;
             }
-            t.editor = i, t.editorFormat = a, t.textarea.style.display = "none", t.editorContainer.style.display = "block", t.editorButton.style.display = "none", this.setMessage(e, "");
+            t.editor = i, t.editorFormat = a, t.textarea.style.display = "none", t.editorContainer.style.display = "block", t.editorSettings.style.display = "none", this.setMessage(e, "");
         }).catch(()=>{
-            this.getSession(e) === t && t.editorRequest === l && (t.editorButton.disabled = !1, t.editorButton.style.display = "", t.textarea.style.display = "", t.editorContainer.style.display = "none", this.setMessage(e, _("Advanced editor could not be loaded; using the plain text editor."), "#c60"));
+            this.getSession(e) === t && t.editorRequest === d && (t.editorButton.disabled = !1, t.editorSource.disabled = !1, t.editorSettings.style.display = "", t.textarea.style.display = "", t.editorContainer.style.display = "none", this.setMessage(e, _("Advanced editor could not be loaded; using the plain text editor."), "#c60"));
         });
     }
     enableEditor(e) {
         let t = this.getSession(e);
         t && this.startAdvancedEditor(e, t);
     }
-    renderWidget(e, s, o) {
+    renderWidget(e, s, r) {
         var n;
-        let r = this.sessions.get(e);
-        null == r || r.unsubscribe(), null == r || null == (n = r.editor) || n.dispose();
-        let a = jsx("textarea", {
+        let a = this.sessions.get(e);
+        null == a || a.unsubscribe(), null == a || null == (n = a.editor) || n.dispose();
+        let l = jsx("textarea", {
             class: "cbi-input-text",
             rows: 18,
             spellcheck: !1,
             wrap: "off",
             style: "box-sizing: border-box; font-family: monospace; resize: vertical; width: 100%;",
-            children: o || ""
-        }), l = jsx("div", {
+            children: r || ""
+        }), d = jsx("div", {
             style: "display:none; height:36em;"
-        }), d = jsx("button", {
-            type: "button",
-            class: "cbi-button cbi-button-action",
-            children: _("Enable advanced editor")
         }), c = jsx("button", {
             type: "button",
             class: "cbi-button cbi-button-action",
+            children: _("Enable advanced editor")
+        }), u = jsx("select", {
+            class: "cbi-input-select"
+        });
+        u.replaceChildren(...MONACO_SOURCE_OPTIONS.map((e)=>jsx("option", {
+                value: e.value,
+                children: e.label
+            })));
+        let h = jsxs("div", {
+            style: "display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:0.75em;",
+            children: [
+                jsx("span", {
+                    children: _("Advanced editor source")
+                }),
+                u,
+                c
+            ]
+        }), p = jsx("button", {
+            type: "button",
+            class: "cbi-button cbi-button-action",
             children: _("Load File")
-        }), u = jsx("button", {
+        }), g = jsx("button", {
             type: "button",
             class: "cbi-button cbi-button-apply",
             children: _("Validate")
-        }), h = jsx("button", {
+        }), f = jsx("button", {
             type: "button",
             class: "cbi-button cbi-button-save",
             children: _("Save File")
-        }), p = jsx("button", {
+        }), v = jsx("button", {
             type: "button",
             class: "cbi-button cbi-button-apply",
             children: _("Save File & Reload")
-        }), g = jsxs("div", {
+        }), b = jsxs("div", {
             style: "display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;",
             children: [
-                c,
-                h,
-                p
+                p,
+                f,
+                v
             ]
-        }), f = jsx("div", {
+        }), m = jsx("div", {
             style: "min-height:1.2em; margin-top:0.75em;"
-        }), v = {
-            textarea: a,
-            editorContainer: l,
-            editorButton: d,
+        }), y = {
+            textarea: l,
+            editorContainer: d,
+            editorSettings: h,
+            editorSource: u,
+            editorButton: c,
             editorRequest: 0,
-            fileActions: g,
-            message: f,
+            fileActions: b,
+            message: m,
             unsubscribe: ()=>{}
         };
-        return v.unsubscribe = this.editorOptions.subscribeSourceChanges(e, ()=>this.updateSourceControls(e)), this.sessions.set(e, v), this.updateSourceControls(e), d.onclick = ()=>this.enableEditor(e), c.onclick = ()=>this.loadFile(e), u.onclick = ()=>this.validateContent(e), h.onclick = ()=>this.saveFile(e, !1), p.onclick = ()=>this.saveFile(e, !0), jsxs("div", {
+        return y.unsubscribe = this.editorOptions.subscribeSourceChanges(e, ()=>this.updateSourceControls(e)), this.sessions.set(e, y), this.updateSourceControls(e), c.onclick = ()=>this.enableEditor(e), p.onclick = ()=>this.loadFile(e), g.onclick = ()=>this.validateContent(e), f.onclick = ()=>this.saveFile(e, !1), v.onclick = ()=>this.saveFile(e, !0), jsxs("div", {
             class: "cbi-value-field",
             children: [
                 jsx("p", {
                     style: "margin-top:0;",
                     children: _("Use the advanced editor for JSON schema validation and completion. YAML and TOML receive schema-based option completion; saving always uses the official FRP validator.")
                 }),
-                jsx("div", {
-                    style: "margin-bottom:0.75em;",
-                    children: d
-                }),
-                a,
+                h,
                 l,
+                d,
                 jsx("div", {
                     style: "display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;",
-                    children: u
+                    children: g
                 }),
-                g,
-                f
+                b,
+                m
             ]
         });
     }

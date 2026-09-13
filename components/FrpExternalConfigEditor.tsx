@@ -1,7 +1,9 @@
 import {
   createFrpConfigEditor,
+  MONACO_SOURCE_OPTIONS,
   type FrpEditorFormat,
   type FrpEditorKind,
+  type MonacoSource,
   type MonacoTextEditor,
 } from "@/utils/frp-editor/monaco";
 import { rpcClient } from "@/utils/rpc-client";
@@ -24,6 +26,8 @@ type EditorSession = {
   editorFormat?: FrpEditorFormat;
   editorRequest: number;
   editorContainer: HTMLElement;
+  editorSettings: HTMLElement;
+  editorSource: HTMLSelectElement;
   editorButton: HTMLButtonElement;
   fileActions: HTMLElement;
   message: HTMLElement;
@@ -205,8 +209,10 @@ class FrpExternalConfigEditor extends L.form.Value {
     session.editorContainer.replaceChildren();
 
     const format = this.currentFormat(sectionId);
+    const source = session.editorSource.value as MonacoSource;
     const request = ++session.editorRequest;
     session.editorButton.disabled = true;
+    session.editorSource.disabled = true;
     this.setMessage(
       sectionId,
       session.editorFormat
@@ -221,6 +227,7 @@ class FrpExternalConfigEditor extends L.form.Value {
       },
       this.editorOptions.kind,
       format,
+      source,
     )
       .then((editor) => {
         if (
@@ -240,7 +247,7 @@ class FrpExternalConfigEditor extends L.form.Value {
         session.editorFormat = format;
         session.textarea.style.display = "none";
         session.editorContainer.style.display = "block";
-        session.editorButton.style.display = "none";
+        session.editorSettings.style.display = "none";
         this.setMessage(sectionId, "");
       })
       .catch(() => {
@@ -250,7 +257,8 @@ class FrpExternalConfigEditor extends L.form.Value {
         )
           return;
         session.editorButton.disabled = false;
-        session.editorButton.style.display = "";
+        session.editorSource.disabled = false;
+        session.editorSettings.style.display = "";
         session.textarea.style.display = "";
         session.editorContainer.style.display = "none";
         this.setMessage(
@@ -292,6 +300,21 @@ class FrpExternalConfigEditor extends L.form.Value {
         {_("Enable advanced editor")}
       </button>
     ) as HTMLButtonElement;
+    const editorSource = (
+      <select class="cbi-input-select"></select>
+    ) as HTMLSelectElement;
+    editorSource.replaceChildren(
+      ...MONACO_SOURCE_OPTIONS.map((source) => (
+        <option value={source.value}>{source.label}</option>
+      )),
+    );
+    const editorSettings = (
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:0.75em;">
+        <span>{_("Advanced editor source")}</span>
+        {editorSource}
+        {editorButton}
+      </div>
+    ) as HTMLElement;
     const loadButton = (
       <button type="button" class="cbi-button cbi-button-action">
         {_("Load File")}
@@ -326,6 +349,8 @@ class FrpExternalConfigEditor extends L.form.Value {
     const session: EditorSession = {
       textarea,
       editorContainer,
+      editorSettings,
+      editorSource,
       editorButton,
       editorRequest: 0,
       fileActions,
@@ -351,7 +376,7 @@ class FrpExternalConfigEditor extends L.form.Value {
             "Use the advanced editor for JSON schema validation and completion. YAML and TOML receive schema-based option completion; saving always uses the official FRP validator.",
           )}
         </p>
-        <div style="margin-bottom:0.75em;">{editorButton}</div>
+        {editorSettings}
         {textarea}
         {editorContainer}
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;">
