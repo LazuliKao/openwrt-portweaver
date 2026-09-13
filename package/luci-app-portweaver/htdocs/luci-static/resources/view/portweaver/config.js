@@ -1520,6 +1520,10 @@ class FrpExternalConfigEditor_n extends L.form.Value {
         let i = arguments.length > 2 && void 0 !== arguments[2] ? arguments[2] : "", s = this.getSession(e);
         s && (s.message.style.color = i, s.message.textContent = t);
     }
+    updateSourceControls(e) {
+        let t = this.getSession(e);
+        t && (t.fileActions.style.display = this.isFileMode(e) ? "flex" : "none");
+    }
     currentFormat(e) {
         return this.editorOptions.getFormat(e);
     }
@@ -1565,8 +1569,9 @@ class FrpExternalConfigEditor_n extends L.form.Value {
         }));
     }
     renderWidget(e, s, o) {
-        var n, a;
-        null == (a = this.sessions.get(e)) || null == (n = a.editor) || n.dispose();
+        var n;
+        let a = this.sessions.get(e);
+        null == a || a.unsubscribe(), null == a || null == (n = a.editor) || n.dispose();
         let r = jsx("textarea", {
             class: "cbi-input-text",
             rows: 18,
@@ -1596,15 +1601,24 @@ class FrpExternalConfigEditor_n extends L.form.Value {
             type: "button",
             class: "cbi-button cbi-button-apply",
             children: _("Save File & Reload")
+        }), p = jsxs("div", {
+            style: "display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;",
+            children: [
+                c,
+                h,
+                g
+            ]
         }), f = jsx("div", {
             style: "min-height:1.2em; margin-top:0.75em;"
-        });
-        return this.sessions.set(e, {
+        }), b = {
             textarea: r,
             editorContainer: l,
             editorButton: d,
-            message: f
-        }), d.onclick = ()=>this.enableEditor(e), c.onclick = ()=>this.loadFile(e), u.onclick = ()=>this.validateContent(e), h.onclick = ()=>this.saveFile(e, !1), g.onclick = ()=>this.saveFile(e, !0), jsxs("div", {
+            fileActions: p,
+            message: f,
+            unsubscribe: ()=>{}
+        };
+        return b.unsubscribe = this.editorOptions.subscribeSourceChanges(e, ()=>this.updateSourceControls(e)), this.sessions.set(e, b), this.updateSourceControls(e), d.onclick = ()=>this.enableEditor(e), c.onclick = ()=>this.loadFile(e), u.onclick = ()=>this.validateContent(e), h.onclick = ()=>this.saveFile(e, !1), g.onclick = ()=>this.saveFile(e, !0), jsxs("div", {
             class: "cbi-value-field",
             children: [
                 jsx("p", {
@@ -1617,15 +1631,11 @@ class FrpExternalConfigEditor_n extends L.form.Value {
                 }),
                 r,
                 l,
-                jsxs("div", {
+                jsx("div", {
                     style: "display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;",
-                    children: [
-                        c,
-                        u,
-                        h,
-                        g
-                    ]
+                    children: u
                 }),
+                p,
                 f
             ]
         });
@@ -1650,29 +1660,50 @@ function createFrpExternalConfigEditor(t) {
 
 ;// CONCATENATED MODULE: ./components/FrpConfigSource.tsx
 
-let FrpConfigSource_t = L.form;
-function FrpConfigSource_o(e, t, o) {
+
+let FrpConfigSource_o = L.form;
+class FrpConfigSource_n {
+    get(e, t, o) {
+        var n;
+        return (null == (n = this.values.get(e)) ? void 0 : n[t]) || o;
+    }
+    set(e, t, o) {
+        let n = this.values.get(e) || {};
+        for (let i of (n[t] = o, this.values.set(e, n), this.listeners.get(e) || []))i();
+    }
+    subscribe(e, t) {
+        let o = this.listeners.get(e) || new Set();
+        return o.add(t), this.listeners.set(e, o), ()=>{
+            o.delete(t), 0 === o.size && this.listeners.delete(e);
+        };
+    }
+    constructor(){
+        _define_property(this, "values", new Map()), _define_property(this, "listeners", new Map());
+    }
+}
+function FrpConfigSource_i(e, t, o) {
     let n = e.formvalue(t);
     return "string" == typeof n && n ? n : o;
 }
-function addFrpNodeConfigSource(n, i) {
-    let r = i.toUpperCase(), a = n.option(FrpConfigSource_t.ListValue, "config_mode", _("Configuration Source"));
-    a.modalonly = !0, a.rmempty = !1, a.default = "builtin", a.value("builtin", _("Built-in Configuration")), a.value("external_file", _("External File")), a.value("external_uci", _("UCI Configuration Text")), a.description = _("Choose the configuration source for this %s instance. Switching source clears the inactive external value.").format(r), a.write = (e, t)=>{
+function addFrpNodeConfigSource(e, r) {
+    let a = r.toUpperCase(), l = new FrpConfigSource_n(), s = e.option(FrpConfigSource_o.ListValue, "config_mode", _("Configuration Source"));
+    s.modalonly = !0, s.rmempty = !1, s.default = "builtin", s.value("builtin", _("Built-in Configuration")), s.value("external_file", _("External File")), s.value("external_uci", _("UCI Configuration Text")), s.description = _("Choose the configuration source for this %s instance. Switching source clears the inactive external value.").format(a), s.onchange = (e, t, o)=>l.set(t, "mode", String(o)), s.write = (e, t)=>{
         let o = String(t);
         return L.uci.set("portweaver", e, "config_mode", o), "external_file" === o ? L.uci.unset("portweaver", e, "config_content") : "external_uci" === o ? L.uci.unset("portweaver", e, "config_path") : (L.uci.unset("portweaver", e, "config_path"), L.uci.unset("portweaver", e, "config_content")), null;
     };
-    let l = n.option(FrpConfigSource_t.ListValue, "config_format", _("Configuration Format"));
-    l.modalonly = !0, l.rmempty = !1, l.default = "toml", l.value("toml", "TOML"), l.value("yaml", "YAML"), l.value("json", "JSON"), l.depends("config_mode", "external_file"), l.depends("config_mode", "external_uci");
-    let c = n.option(FrpConfigSource_t.Value, "config_path", _("Configuration File Path"));
-    c.modalonly = !0, c.rmempty = !1, c.placeholder = "/etc/portweaver/".concat(i, ".toml"), c.description = _("Absolute path below the configured FRP configuration root. Parent directories must already exist."), c.depends("config_mode", "external_file");
-    let u = n.option(createFrpExternalConfigEditor({
-        kind: i,
+    let c = e.option(FrpConfigSource_o.ListValue, "config_format", _("Configuration Format"));
+    c.modalonly = !0, c.rmempty = !1, c.default = "toml", c.value("toml", "TOML"), c.value("yaml", "YAML"), c.value("json", "JSON"), c.depends("config_mode", "external_file"), c.depends("config_mode", "external_uci"), c.onchange = (e, t, o)=>l.set(t, "format", String(o));
+    let u = e.option(FrpConfigSource_o.Value, "config_path", _("Configuration File Path"));
+    u.modalonly = !0, u.rmempty = !1, u.placeholder = "/etc/portweaver/".concat(r, ".toml"), u.description = _("Absolute path below the configured FRP configuration root. Parent directories must already exist."), u.depends("config_mode", "external_file"), u.onchange = (e, t, o)=>l.set(t, "path", String(o));
+    let f = e.option(createFrpExternalConfigEditor({
+        kind: r,
         optionName: "config_content",
-        getMode: (e)=>FrpConfigSource_o(a, e, "builtin"),
-        getFormat: (e)=>FrpConfigSource_o(l, e, "toml"),
-        getPath: (e)=>FrpConfigSource_o(c, e, "")
-    }), "config_content", _("".concat(r, " Configuration")));
-    u.modalonly = !0, u.rmempty = !1, u.depends("config_mode", "external_file"), u.depends("config_mode", "external_uci");
+        getMode: (e)=>l.get(e, "mode", FrpConfigSource_i(s, e, "builtin")),
+        getFormat: (e)=>l.get(e, "format", FrpConfigSource_i(c, e, "toml")),
+        getPath: (e)=>l.get(e, "path", FrpConfigSource_i(u, e, "")),
+        subscribeSourceChanges: (e, t)=>l.subscribe(e, t)
+    }), "config_content", _("".concat(a, " Configuration")));
+    f.modalonly = !0, f.rmempty = !1, f.depends("config_mode", "external_file"), f.depends("config_mode", "external_uci");
 }
 
 ;// CONCATENATED MODULE: ./components/ProxyStatsViewer.tsx

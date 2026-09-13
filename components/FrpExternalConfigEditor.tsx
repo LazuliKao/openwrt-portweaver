@@ -12,6 +12,10 @@ type EditorOptions = {
   getMode: (sectionId: string) => string;
   getFormat: (sectionId: string) => FrpEditorFormat;
   getPath: (sectionId: string) => string;
+  subscribeSourceChanges: (
+    sectionId: string,
+    listener: () => void,
+  ) => () => void;
 };
 
 type EditorSession = {
@@ -19,7 +23,9 @@ type EditorSession = {
   editor?: MonacoTextEditor;
   editorContainer: HTMLElement;
   editorButton: HTMLButtonElement;
+  fileActions: HTMLElement;
   message: HTMLElement;
+  unsubscribe: () => void;
 };
 
 class FrpExternalConfigEditor extends L.form.Value {
@@ -48,6 +54,14 @@ class FrpExternalConfigEditor extends L.form.Value {
     if (!session) return;
     session.message.style.color = color;
     session.message.textContent = message;
+  }
+
+  private updateSourceControls(sectionId: string): void {
+    const session = this.getSession(sectionId);
+    if (!session) return;
+    session.fileActions.style.display = this.isFileMode(sectionId)
+      ? "flex"
+      : "none";
   }
 
   private currentFormat(sectionId: string): FrpEditorFormat {
@@ -218,7 +232,9 @@ class FrpExternalConfigEditor extends L.form.Value {
   }
 
   renderWidget(sectionId: string, _optionIndex: number, cfgvalue: string) {
-    this.sessions.get(sectionId)?.editor?.dispose();
+    const previousSession = this.sessions.get(sectionId);
+    previousSession?.unsubscribe();
+    previousSession?.editor?.dispose();
     const textarea = (
       <textarea
         class="cbi-input-text"
@@ -258,16 +274,31 @@ class FrpExternalConfigEditor extends L.form.Value {
         {_("Save File & Reload")}
       </button>
     ) as HTMLButtonElement;
+    const fileActions = (
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;">
+        {loadButton}
+        {saveButton}
+        {saveReloadButton}
+      </div>
+    ) as HTMLElement;
     const message = (
       <div style="min-height:1.2em; margin-top:0.75em;"></div>
     ) as HTMLElement;
 
-    this.sessions.set(sectionId, {
+    const session: EditorSession = {
       textarea,
       editorContainer,
       editorButton,
+      fileActions,
       message,
-    });
+      unsubscribe: () => {},
+    };
+    session.unsubscribe = this.editorOptions.subscribeSourceChanges(
+      sectionId,
+      () => this.updateSourceControls(sectionId),
+    );
+    this.sessions.set(sectionId, session);
+    this.updateSourceControls(sectionId);
     editorButton.onclick = () => this.enableEditor(sectionId);
     loadButton.onclick = () => this.loadFile(sectionId);
     validateButton.onclick = () => this.validateContent(sectionId);
@@ -285,11 +316,9 @@ class FrpExternalConfigEditor extends L.form.Value {
         {textarea}
         {editorContainer}
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75em;">
-          {loadButton}
           {validateButton}
-          {saveButton}
-          {saveReloadButton}
         </div>
+        {fileActions}
         {message}
       </div>
     );
