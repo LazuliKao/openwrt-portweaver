@@ -4,6 +4,7 @@ export const MONACO_VERSION = "0.56.0";
 export const MONACO_ESM_VERSION = "0.56.1";
 export const MONACO_YAML_VERSION = "5.5.1";
 export const MONACO_CDN_TIMEOUT = 15_000;
+export const TAPLO_LSP_URL = "https://esm.sh/@taplo/lsp@0.8.0?bundle";
 
 export const SCHEMA_COMMIT = "bf8926da67eb09d5508e3403e3d538a90e66e739";
 

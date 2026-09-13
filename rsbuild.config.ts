@@ -20,7 +20,7 @@ export default defineConfig({
   },
   output: {
     polyfill: "off",
-    module: true,
+    module: false,
     charset: "ascii",
     overrideBrowserslist: [
       "defaults",
@@ -38,7 +38,7 @@ export default defineConfig({
     filename: {
       js: "[name].js",
     },
-    assetPrefix: "",
+    assetPrefix: "/luci-static/resources/view/portweaver/",
     minify: false,
     cleanDistPath: true,
   },
@@ -74,7 +74,7 @@ export default defineConfig({
     rspack: (config) => {
       // Configure output for LuCI: simple return statement at module level
       config.output = config.output || {};
-      // config.output.iife = true; // No IIFE wrapper
+      config.output.iife = false;
 
       config.optimization = config.optimization || {};
       config.optimization.splitChunks = false;

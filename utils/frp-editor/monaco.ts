@@ -6,7 +6,8 @@ import {
   type MonacoCdnProvider,
   type MonacoSource,
 } from "./providers";
-import { registerSchemaCompletions } from "./toml";
+import { attachTaplo } from "./taplo";
+import { registerTomlLanguage } from "./toml";
 import type {
   FrpEditorFormat,
   FrpEditorKind,
@@ -22,6 +23,7 @@ export { MONACO_SOURCE_OPTIONS };
 
 const monacoPromises = new Map<string, Promise<LoadedMonaco>>();
 const schemas = new Map<FrpEditorKind, Record<string, unknown>>();
+let nextModelId = 1;
 const schemaPromises = new Map<
   FrpEditorKind,
   Promise<Record<string, unknown> | undefined>
@@ -75,6 +77,7 @@ function loadProvider(provider: MonacoCdnProvider): Promise<LoadedMonaco> {
     | ReturnType<MonacoCdnProvider["loadYamlModule"]>
     | undefined;
 
+  const loadYamlSyntax = provider.loadYamlSyntax;
   const resources = Promise.all([module, jsonDefaults, stylesheet]).then(
     ([monaco, defaults, style]) => ({
       monaco,
@@ -89,9 +92,7 @@ function loadProvider(provider: MonacoCdnProvider): Promise<LoadedMonaco> {
         );
         return yamlModulePromise;
       },
-      loadYamlSyntax: provider.loadYamlSyntax
-        ? () => provider.loadYamlSyntax?.()
-        : undefined,
+      loadYamlSyntax: loadYamlSyntax ? () => loadYamlSyntax() : undefined,
       style,
     }),
   );
@@ -157,7 +158,12 @@ export async function createFrpConfigEditor(
     loadSchema(kind),
   ]);
   const { monaco, jsonDefaults } = loaded;
-  const uri = monaco.Uri.parse(`inmemory://portweaver/${kind}.${format}`);
+  const uri =
+    format === "toml"
+      ? monaco.Uri.parse(`file:///workspace/${kind}-${nextModelId++}.toml`)
+      : monaco.Uri.parse(
+          `inmemory://portweaver/${kind}-${nextModelId++}.${format}`,
+        );
 
   if (format === "json") {
     jsonDefaults.setDiagnosticsOptions({
@@ -165,7 +171,7 @@ export async function createFrpConfigEditor(
       enableSchemaRequest: false,
       schemas: schema
         ? [...schemas.entries()].map(([schemaKind, value]) => ({
-            fileMatch: [`inmemory://portweaver/${schemaKind}.json`],
+            fileMatch: [`inmemory://portweaver/${schemaKind}-*.json`],
             schema: value,
             uri: SCHEMA_URLS[schemaKind],
           }))
@@ -174,11 +180,15 @@ export async function createFrpConfigEditor(
     });
   } else if (format === "yaml") {
     await configureYaml(loaded, schemas);
-  } else if (schema) {
-    registerSchemaCompletions(monaco, "toml", schema);
+  } else {
+    registerTomlLanguage(monaco);
   }
 
   const model = monaco.editor.createModel(initialValue(), format, uri);
+  const taplo =
+    format === "toml"
+      ? await attachTaplo(monaco, model, SCHEMA_URLS[kind], schema)
+      : undefined;
   monaco.editor.setTheme(prefersDarkTheme() ? "vs-dark" : "vs");
   const editor = monaco.editor.create(container, {
     automaticLayout: true,
@@ -195,6 +205,7 @@ export async function createFrpConfigEditor(
     setValue: (value) => model.setValue(value),
     dispose: () => {
       listener.dispose();
+      taplo?.dispose();
       editor.dispose();
       model.dispose();
     },

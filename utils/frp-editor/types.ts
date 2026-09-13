@@ -4,7 +4,10 @@ import type { LanguageServiceDefaults } from "monaco-editor/languages/features/j
 export type FrpEditorKind = "frpc" | "frps";
 export type FrpEditorFormat = "toml" | "yaml" | "json";
 
-export type MonacoAPI = Pick<typeof Monaco, "Uri" | "editor" | "languages">;
+export type MonacoAPI = Pick<
+  typeof Monaco,
+  "MarkerSeverity" | "Uri" | "editor" | "languages"
+>;
 export type MonacoJSONDefaults = LanguageServiceDefaults;
 
 export type MonacoWebWorkerOptions = {

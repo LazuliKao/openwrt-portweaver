@@ -80,7 +80,7 @@ export async function configureYaml(
   await ensureYamlSyntax(loaded);
 
   const schemasForYaml = [...schemas.entries()].map(([kind, schema]) => ({
-    fileMatch: [`inmemory://portweaver/${kind}.yaml`],
+    fileMatch: [`inmemory://portweaver/${kind}-*.yaml`],
     schema,
     uri: SCHEMA_URLS[kind],
   }));
