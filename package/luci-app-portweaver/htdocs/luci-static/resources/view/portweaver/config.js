@@ -1352,129 +1352,228 @@ class LogViewerDialog {
     }
 }
 
-;// CONCATENATED MODULE: ./utils/frp-editor/monaco.ts
-let monaco_e, monaco_o;
-
-
-let monaco_n = "0.56.0", monaco_a = "0.56.1", monaco_l = "5.5.1", monaco_s = "https://esm.sh/monaco-yaml@".concat(monaco_l, "/X-ZG1vbmFjby1lZGl0b3JAMC41Ni4w/es2022/yaml.worker.bundle.mjs"), monaco_c = "bf8926da67eb09d5508e3403e3d538a90e66e739", monaco_i = {
-    frpc: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(monaco_c, "/frpc-schema.json"),
-    frps: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(monaco_c, "/frps-schema.json")
+;// CONCATENATED MODULE: ./utils/frp-editor/constants.ts
+const MONACO_VERSION = "0.56.0";
+const MONACO_ESM_VERSION = "0.56.1";
+const MONACO_YAML_VERSION = "5.5.1";
+const MONACO_CDN_TIMEOUT = 15000;
+const SCHEMA_COMMIT = "bf8926da67eb09d5508e3403e3d538a90e66e739";
+const SCHEMA_URLS = {
+    frpc: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(SCHEMA_COMMIT, "/frpc-schema.json"),
+    frps: "https://raw.githubusercontent.com/LazuliKao/frp-schemas/".concat(SCHEMA_COMMIT, "/frps-schema.json")
 };
-const MONACO_SOURCE_OPTIONS = [
-    {
-        value: "esm",
-        label: "esm.sh"
-    },
-    {
-        value: "jsdelivr",
-        label: "jsDelivr"
-    },
-    {
-        value: "fastly",
-        label: "jsDelivr (Fastly)"
-    },
-    {
-        value: "gcore",
-        label: "jsDelivr (Gcore)"
-    },
-    {
-        value: "unpkg",
-        label: "unpkg"
-    }
-];
-let monaco_m = new Map(), monaco_u = new Map(), monaco_d = new Set(), monaco_p = new WeakSet(), monaco_h = [
-    {
-        id: "esm",
-        name: "esm.sh",
-        moduleUrl: "https://esm.sh/monaco-editor@".concat(monaco_n, "?bundle"),
-        editorWorkerUrl: "https://esm.sh/monaco-editor@".concat(monaco_n, "/esm/vs/editor/editor.worker.js"),
-        jsonWorkerUrl: "https://esm.sh/monaco-editor@".concat(monaco_n, "/esm/vs/language/json/json.worker.js"),
-        yamlModuleUrl: "https://esm.sh/monaco-yaml@".concat(monaco_l, "?bundle&deps=monaco-editor@").concat(monaco_n),
-        yamlWorkerUrl: monaco_s,
-        styleUrl: "https://esm.sh/monaco-editor@".concat(monaco_n, "/min/vs/editor/editor.main.css")
-    },
-    ...[
-        [
-            "jsdelivr",
-            "jsDelivr",
-            "https://cdn.jsdelivr.net/npm"
-        ],
-        [
-            "fastly",
-            "jsDelivr (Fastly)",
-            "https://fastly.jsdelivr.net/npm"
-        ],
-        [
-            "gcore",
-            "jsDelivr (Gcore)",
-            "https://gcore.jsdelivr.net/npm"
-        ],
-        [
-            "unpkg",
-            "unpkg",
-            "https://unpkg.com"
-        ]
-    ].map((e)=>{
-        let [o, r, t] = e;
-        return {
-            id: o,
-            name: r,
-            moduleUrl: "".concat(t, "/@node-projects/monaco-editor-esm@").concat(monaco_a, "/esm/vs/editor/editor.api.js"),
-            jsonModuleUrl: "".concat(t, "/@node-projects/monaco-editor-esm@").concat(monaco_a, "/esm/vs/languages/features/json/register.js"),
-            jsonModeUrl: "".concat(t, "/@node-projects/monaco-editor-esm@").concat(monaco_a, "/esm/vs/languages/features/json/jsonMode.js"),
-            editorWorkerUrl: "".concat(t, "/@node-projects/monaco-editor-esm@").concat(monaco_a, "/esm/vs/editor/editor.worker.js"),
-            jsonWorkerUrl: "".concat(t, "/@node-projects/monaco-editor-esm@").concat(monaco_a, "/esm/vs/language/json/json.worker.js"),
-            yamlModuleUrl: "unpkg" === o ? "".concat(t, "/monaco-yaml@").concat(monaco_l, "?module") : "".concat(t, "/monaco-yaml@").concat(monaco_l, "/+esm"),
-            yamlWorkerUrl: "unpkg" === o ? "".concat(t, "/monaco-yaml@").concat(monaco_l, "/yaml.worker.js?module") : "".concat(t, "/monaco-yaml@").concat(monaco_l, "/yaml.worker.js/+esm"),
-            yamlWorkerSourceUrl: "unpkg" === o ? void 0 : "".concat(t, "/monaco-yaml@").concat(monaco_l, "/yaml.worker.js/+esm"),
-            styleUrl: "".concat(t, "/@node-projects/monaco-editor-esm@").concat(monaco_a, "/min/vs/editor/editor.main.css")
-        };
-    })
-];
-function monaco_f(e) {
-    return monaco_g("import ".concat(JSON.stringify(e), ";"));
+
+;// CONCATENATED MODULE: ./utils/frp-editor/helpers.ts
+function loadStylesheet(e) {
+    return new Promise((r, o)=>{
+        let t = document.createElement("link");
+        t.rel = "stylesheet", t.href = e, t.onload = ()=>r(t), t.onerror = ()=>{
+            t.remove(), o(Error("Unable to load Monaco stylesheet from ".concat(e, ".")));
+        }, document.head.appendChild(t);
+    });
 }
-function monaco_g(e) {
-    let o = new Blob([
+function createModuleWorker(e) {
+    return createModuleWorkerFromSource("import ".concat(JSON.stringify(e), ";"));
+}
+function createModuleWorkerFromSource(e) {
+    let r = new Blob([
         e
     ], {
         type: "application/javascript"
-    }), r = URL.createObjectURL(o);
+    }), o = URL.createObjectURL(r);
     try {
-        return new Worker(r, {
+        return new Worker(o, {
             type: "module"
         });
     } finally{
-        URL.revokeObjectURL(r);
+        URL.revokeObjectURL(o);
     }
 }
-function monaco_j(e) {
-    let o;
-    return e.yamlWorkerSourceUrl ? (o = e.yamlWorkerSourceUrl) ? monaco_k(fetch(o).then((o)=>{
-        if (!o.ok) throw Error("Unable to load YAML worker from ".concat(e.name, "."));
-        return o.text();
-    }).then((r)=>{
-        let t = "data:text/javascript;charset=utf-8,".concat(encodeURIComponent("import { initialize as initializeEditorWorker } from ".concat(JSON.stringify(e.editorWorkerUrl), "; export function initialize(create) { self.onmessage = () => { initializeEditorWorker((ctx, createData) => Object.create(create(ctx, createData))); }; }"))), n = r.replace(/(from\s*["'])\/npm\/monaco-worker-manager@[^"']+\/worker\/\+esm(["'])/, "$1".concat(t, "$2"));
-        if (n === r) throw Error("jsDelivr YAML worker dependency was not found.");
-        let a = new URL(o).origin;
-        return monaco_g(n.replace(/(["'])\/(npm|node)\//g, "$1".concat(a, "/$2/")));
-    }), 15000) : Promise.resolve(monaco_f(e.yamlWorkerUrl)) : monaco_f(e.yamlWorkerUrl);
-}
-function monaco_v(e) {
+function importRemoteModule(e) {
     return Function("url", "return import(url);")(e);
 }
-function monaco_k(e, o) {
-    return new Promise((r, t)=>{
-        let n = window.setTimeout(()=>t(Error("Monaco CDN request timed out.")), o);
+function withTimeout(e, r) {
+    return new Promise((o, t)=>{
+        let n = window.setTimeout(()=>t(Error("Monaco CDN request timed out.")), r);
         e.then((e)=>{
-            window.clearTimeout(n), r(e);
+            window.clearTimeout(n), o(e);
         }, (e)=>{
             window.clearTimeout(n), t(e);
         });
     });
 }
-async function monaco_y(e) {
-    let n = {
+function backgroundLuminance(e) {
+    var r;
+    let o = null == (r = getComputedStyle(e).backgroundColor.match(/\d+/g)) ? void 0 : r.map(Number);
+    if (o && !(o.length < 3) && 0 !== o[3]) return 0.299 * o[0] + 0.587 * o[1] + 0.114 * o[2];
+}
+function prefersDarkTheme() {
+    for (let e of [
+        document.body,
+        document.documentElement
+    ]){
+        let r = backgroundLuminance(e);
+        if (void 0 !== r) return r < 128;
+    }
+    return matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+;// CONCATENATED MODULE: ./utils/frp-editor/providers/esm.ts
+
+
+let esm_r = "https://esm.sh/monaco-yaml@".concat((/* inlined export .MONACO_YAML_VERSION */"5.5.1"), "/X-ZG1vbmFjby1lZGl0b3JAMC41Ni4w/es2022/yaml.worker.bundle.mjs");
+const esmProvider = {
+    id: "esm",
+    label: "esm.sh",
+    getStyleUrl: ()=>"https://esm.sh/monaco-editor@".concat((/* inlined export .MONACO_VERSION */"0.56.0"), "/min/vs/editor/editor.main.css"),
+    loadModule: ()=>importRemoteModule("https://esm.sh/monaco-editor@".concat((/* inlined export .MONACO_VERSION */"0.56.0"), "?bundle")),
+    createEditorWorker: ()=>createModuleWorker("https://esm.sh/monaco-editor@".concat((/* inlined export .MONACO_VERSION */"0.56.0"), "/esm/vs/editor/editor.worker.js")),
+    createJsonWorker: ()=>createModuleWorker("https://esm.sh/monaco-editor@".concat((/* inlined export .MONACO_VERSION */"0.56.0"), "/esm/vs/language/json/json.worker.js")),
+    createYamlWorker: ()=>createModuleWorker(esm_r),
+    loadYamlModule: ()=>importRemoteModule("https://esm.sh/monaco-yaml@".concat((/* inlined export .MONACO_YAML_VERSION */"5.5.1"), "?bundle&deps=monaco-editor@").concat((/* inlined export .MONACO_VERSION */"0.56.0")))
+};
+
+;// CONCATENATED MODULE: ./utils/frp-editor/providers/jsdelivr.ts
+
+
+function jsdelivr_i(i, m, d) {
+    let l = "esmrun" === i, p = l ? "https://cdn.jsdelivr.net/npm/@node-projects/monaco-editor-esm@".concat((/* inlined export .MONACO_ESM_VERSION */"0.56.1"), "/esm/vs/editor/editor.worker.js") : "".concat(d, "/@node-projects/monaco-editor-esm@").concat((/* inlined export .MONACO_ESM_VERSION */"0.56.1"), "/esm/vs/editor/editor.worker.js"), j = l ? "https://cdn.jsdelivr.net/npm/@node-projects/monaco-editor-esm@".concat((/* inlined export .MONACO_ESM_VERSION */"0.56.1"), "/esm/vs/editor/json.worker.js") : "".concat(d, "/@node-projects/monaco-editor-esm@").concat((/* inlined export .MONACO_ESM_VERSION */"0.56.1"), "/esm/vs/editor/json.worker.js"), v = l ? "https://cdn.jsdelivr.net/npm/monaco-yaml@".concat((/* inlined export .MONACO_YAML_VERSION */"5.5.1"), "/yaml.worker.js/+esm") : "".concat(d, "/monaco-yaml@").concat((/* inlined export .MONACO_YAML_VERSION */"5.5.1"), "/yaml.worker.js/+esm");
+    return {
+        id: i,
+        label: m,
+        getStyleUrl: ()=>l ? "https://cdn.jsdelivr.net/npm/monaco-editor@".concat((/* inlined export .MONACO_VERSION */"0.56.0"), "/min/vs/editor/editor.main.css") : "".concat(d, "/monaco-editor@").concat((/* inlined export .MONACO_VERSION */"0.56.0"), "/min/vs/editor/editor.main.css"),
+        loadModule: ()=>importRemoteModule(l ? "https://esm.run/monaco-editor@".concat((/* inlined export .MONACO_VERSION */"0.56.0")) : "".concat(d, "/monaco-editor@").concat((/* inlined export .MONACO_VERSION */"0.56.0"), "/+esm")),
+        createEditorWorker: ()=>createModuleWorker(p),
+        createJsonWorker: ()=>createModuleWorker(j),
+        createYamlWorker: ()=>withTimeout(fetch(v).then((e)=>{
+                if (!e.ok) throw Error("Unable to load YAML worker from ".concat(m, "."));
+                return e.text();
+            }).then((e)=>{
+                let t = "data:text/javascript;charset=utf-8,".concat(encodeURIComponent("import { initialize as initializeEditorWorker } from ".concat(JSON.stringify(p), "; export function initialize(create) { self.onmessage = () => { initializeEditorWorker((ctx, createData) => Object.create(create(ctx, createData))); }; }"))), o = e.replace(/(from\s*["'])\/npm\/monaco-worker-manager@[^"']+\/worker\/\+esm(["'])/, "$1".concat(t, "$2"));
+                if (o === e) throw Error("jsDelivr YAML worker dependency was not found.");
+                let r = v.startsWith("https://esm.run") ? "https://cdn.jsdelivr.net" : new URL(v).origin;
+                return createModuleWorkerFromSource(o.replace(/(["'])\/(npm|node)\//g, "$1".concat(r, "/$2/")));
+            }), (/* inlined export .MONACO_CDN_TIMEOUT */15000)),
+        loadYamlModule: ()=>importRemoteModule(l ? "https://esm.run/monaco-yaml@".concat((/* inlined export .MONACO_YAML_VERSION */"5.5.1")) : "".concat(d, "/monaco-yaml@").concat((/* inlined export .MONACO_YAML_VERSION */"5.5.1"), "/+esm"))
+    };
+}
+const jsdelivrProvider = jsdelivr_i("jsdelivr", "jsDelivr", "https://cdn.jsdelivr.net/npm");
+const fastlyProvider = jsdelivr_i("fastly", "jsDelivr (Fastly)", "https://fastly.jsdelivr.net/npm");
+const gcoreProvider = jsdelivr_i("gcore", "jsDelivr (Gcore)", "https://gcore.jsdelivr.net/npm");
+const esmrunProvider = jsdelivr_i("esmrun", "esm.run", "https://esm.run");
+
+;// CONCATENATED MODULE: ./utils/frp-editor/providers/registry.ts
+
+
+let registry_t = [
+    esmProvider,
+    esmrunProvider
+];
+const MONACO_SOURCE_OPTIONS = registry_t.filter((e)=>!1 !== e.enabled).map((e)=>({
+        value: e.id,
+        label: e.label
+    }));
+let registry_i = new Map(registry_t.map((e)=>[
+        e.id,
+        e
+    ]));
+function getProvider(e) {
+    return registry_i.get(e);
+}
+function registerProvider(e) {
+    registry_i.set(e.id, e);
+}
+
+;// CONCATENATED MODULE: ./utils/frp-editor/providers/index.ts
+
+
+
+
+
+
+;// CONCATENATED MODULE: ./utils/frp-editor/toml.ts
+let toml_e = new Set();
+function registerSchemaCompletions(t, n, r) {
+    let o = "".concat(n, ":").concat(String(r.$id || "frp"));
+    if (toml_e.has(o)) return;
+    toml_e.add(o), toml_e.has(n) || (toml_e.add(n), t.languages.register({
+        id: n
+    }), t.languages.setMonarchTokensProvider(n, {
+        tokenizer: {
+            root: [
+                [
+                    /#.*$/,
+                    "comment"
+                ],
+                [
+                    /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/,
+                    "string"
+                ],
+                [
+                    /\b(?:true|false)\b/,
+                    "keyword"
+                ],
+                [
+                    /\b\d+(?:\.\d+)?\b/,
+                    "number"
+                ],
+                [
+                    /[A-Za-z_][\w-]*(?=\s*(?:=|:))/,
+                    "type"
+                ]
+            ]
+        }
+    }));
+    let i = r.properties || {};
+    t.languages.registerCompletionItemProvider(n, {
+        triggerCharacters: [
+            ".",
+            "-"
+        ],
+        provideCompletionItems: (e, r)=>({
+                suggestions: Object.entries(i).map((e)=>{
+                    var o, i;
+                    let [a, s] = e;
+                    return {
+                        label: a,
+                        kind: t.languages.CompletionItemKind.Property,
+                        documentation: s.description || "FRP configuration option",
+                        insertText: "toml" === n ? "".concat(a, " = ").concat(JSON.stringify(null != (o = s.default) ? o : "")) : "".concat(a, ": ").concat(JSON.stringify(null != (i = s.default) ? i : "")),
+                        insertTextRules: t.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        range: {
+                            startLineNumber: r.lineNumber,
+                            endLineNumber: r.lineNumber,
+                            startColumn: r.column,
+                            endColumn: r.column
+                        }
+                    };
+                })
+            })
+    });
+}
+
+;// CONCATENATED MODULE: ./utils/frp-editor/yaml.ts
+let yaml_e;
+
+
+
+let yaml_t = new WeakSet();
+function installYamlWorkerCompatibility(e) {
+    var o;
+    if (yaml_t.has(e)) return;
+    yaml_t.add(e);
+    let l = e.editor.createWebWorker, n = null == (o = globalThis.MonacoEnvironment) ? void 0 : o.getWorker;
+    l && n && (e.editor.createWebWorker = (e)=>{
+        var o, t;
+        if ("worker" in e) return l(e);
+        let i = Promise.resolve(n(null != (o = e.moduleId) ? o : "workerMain.js", null != (t = e.label) ? t : "yaml")).then((r)=>(r.postMessage("ignore"), r.postMessage(e.createData), r));
+        return l(_object_spread_props(_object_spread({}, e), {
+            worker: i
+        }));
+    });
+}
+async function configureYaml(r, a) {
+    let t = {
         completion: !0,
         enableSchemaRequest: !1,
         format: {
@@ -1482,99 +1581,90 @@ async function monaco_y(e) {
         },
         hover: !0,
         schemas: [
-            ...monaco_m.entries()
+            ...a.entries()
         ].map((e)=>{
-            let [o, r] = e;
+            let [r, a] = e;
             return {
                 fileMatch: [
-                    "inmemory://portweaver/".concat(o, ".yaml")
+                    "inmemory://portweaver/".concat(r, ".yaml")
                 ],
-                schema: r,
-                uri: monaco_i[o]
+                schema: a,
+                uri: SCHEMA_URLS[r]
             };
         }),
         validate: !0,
         yamlVersion: "1.2"
     };
-    monaco_o ? await monaco_o.update(n) : (!function(e) {
-        var o;
-        if (monaco_p.has(e)) return;
-        monaco_p.add(e);
-        let n = e.editor.createWebWorker, a = null == (o = globalThis.MonacoEnvironment) ? void 0 : o.getWorker;
-        n && a && (e.editor.createWebWorker = (e)=>{
-            var o, l;
-            if ("worker" in e) return n(e);
-            let s = Promise.resolve(a(null != (o = e.moduleId) ? o : "workerMain.js", null != (l = e.label) ? l : "yaml")).then((o)=>(o.postMessage("ignore"), o.postMessage(e.createData), o));
-            return n(_object_spread_props(_object_spread({}, e), {
-                worker: s
-            }));
-        });
-    }(e.monaco), monaco_o = (await e.loadYamlModule()).configureMonacoYaml(e.monaco, n));
+    yaml_e ? await yaml_e.update(t) : (installYamlWorkerCompatibility(r.monaco), yaml_e = (await r.loadYamlModule()).configureMonacoYaml(r.monaco, t));
 }
-async function createFrpConfigEditor(o, n, a, l, s) {
-    let c = arguments.length > 5 && void 0 !== arguments[5] ? arguments[5] : "esm", [p, g] = await Promise.all([
+
+;// CONCATENATED MODULE: ./utils/frp-editor/monaco.ts
+let monaco_e;
+
+
+
+
+
+
+
+let monaco_d = new Map(), monaco_p = new Map();
+async function createFrpConfigEditor(c, h, f, v, g) {
+    let k = arguments.length > 5 && void 0 !== arguments[5] ? arguments[5] : "esm", [w, M] = await Promise.all([
         function() {
-            var o, n, a, l;
-            let s, c, i, m, u, d, p, g = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : "esm";
+            var a, l, c;
+            let m, u, d, p, h, f, v, g = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : "esm";
             if (monaco_e) return monaco_e;
-            let y = monaco_h.find((e)=>e.id === g);
-            if (!y) return Promise.reject(Error("Unknown Monaco source: ".concat(g, ".")));
-            let w = (o = ()=>monaco_f(y.editorWorkerUrl), n = ()=>monaco_f(y.jsonWorkerUrl), a = ()=>monaco_j(y), i = (c = globalThis).MonacoEnvironment, c.MonacoEnvironment = _object_spread_props(_object_spread({}, i), {
-                getWorker: (e, r)=>"yaml" === r || "monaco-yaml/yaml.worker" === e ? a() : (null == i ? void 0 : i.getWorker) ? i.getWorker(e, r) : ("json" === r ? n : o)()
-            }), l = y.styleUrl, m = new Promise((e, o)=>{
-                let r = document.createElement("link");
-                r.rel = "stylesheet", r.href = l, r.onload = ()=>e(r), r.onerror = ()=>{
-                    r.remove(), o(Error("Unable to load Monaco stylesheet from ".concat(l, ".")));
-                }, document.head.appendChild(r);
-            }), u = monaco_v(y.moduleUrl), d = y.jsonModuleUrl && y.jsonModeUrl ? Promise.all([
-                monaco_v(y.jsonModuleUrl),
-                monaco_v(y.jsonModeUrl)
+            let k = getProvider(g);
+            if (!k) return Promise.reject(Error("Unknown Monaco source: ".concat(g, ".")));
+            let w = (a = ()=>k.createEditorWorker(), l = ()=>k.createJsonWorker(), c = ()=>k.createYamlWorker(), d = (u = globalThis).MonacoEnvironment, u.MonacoEnvironment = _object_spread_props(_object_spread({}, d), {
+                getWorker: (e, o)=>"yaml" === o || "monaco-yaml/yaml.worker" === e ? c() : (null == d ? void 0 : d.getWorker) ? d.getWorker(e, o) : ("json" === o ? l : a)()
+            }), p = loadStylesheet(k.getStyleUrl()), h = k.loadModule(), f = k.loadJsonDefaults ? k.loadJsonDefaults().then((e)=>{
+                if (!e) throw Error("Monaco JSON support is unavailable.");
+                return e;
+            }) : h.then((e)=>{
+                var o, r, t, a;
+                let n = null != (o = null == (t = e.languages) || null == (r = t.json) ? void 0 : r.jsonDefaults) ? o : null == (a = e.json) ? void 0 : a.jsonDefaults;
+                if (!n) throw Error("Monaco JSON support is unavailable.");
+                return n;
+            }), v = Promise.all([
+                h,
+                f,
+                p
             ]).then((e)=>{
-                let [o] = e;
-                return o.jsonDefaults;
-            }) : u.then((e)=>{
-                var o;
-                if (!(null == (o = e.json) ? void 0 : o.jsonDefaults)) throw Error("Monaco JSON support is unavailable.");
-                return e.json.jsonDefaults;
-            }), p = Promise.all([
-                u,
-                d,
-                m
-            ]).then((e)=>{
-                let [o, r, t] = e;
+                let [o, r, a] = e;
                 return {
                     monaco: o,
                     jsonDefaults: r,
-                    createEditorWorker: ()=>monaco_f(y.editorWorkerUrl),
-                    createJsonWorker: ()=>monaco_f(y.jsonWorkerUrl),
-                    createYamlWorker: ()=>monaco_j(y),
-                    loadYamlModule: ()=>(null != s || (s = monaco_k(monaco_v(y.yamlModuleUrl), 15000)), s),
-                    style: t
+                    createEditorWorker: ()=>k.createEditorWorker(),
+                    createJsonWorker: ()=>k.createJsonWorker(),
+                    createYamlWorker: ()=>k.createYamlWorker(),
+                    loadYamlModule: ()=>(null != m || (m = withTimeout(k.loadYamlModule(), (/* inlined export .MONACO_CDN_TIMEOUT */15000))), m),
+                    style: a
                 };
-            }), monaco_k(p, 15000).catch((e)=>{
-                throw m.then((e)=>e.remove(), ()=>void 0), Error("Unable to load Monaco from ".concat(y.name, "."), {
+            }), withTimeout(v, (/* inlined export .MONACO_CDN_TIMEOUT */15000)).catch((e)=>{
+                throw p.then((e)=>e.remove(), ()=>void 0), Error("Unable to load Monaco from ".concat(k.label, "."), {
                     cause: e
                 });
             }));
             return monaco_e = w, w.catch(()=>{
                 monaco_e === w && (monaco_e = void 0);
             }), w;
-        }(c),
+        }(k),
         function(e) {
-            let o = monaco_u.get(e);
+            let o = monaco_p.get(e);
             if (o) return o;
-            let r = fetch(monaco_i[e]).then((e)=>{
+            let r = fetch(SCHEMA_URLS[e]).then((e)=>{
                 if (!e.ok) throw Error("Unable to load the FRP schema.");
                 return e.json();
-            }).then((o)=>(monaco_m.set(e, o), o)).catch(()=>void 0);
-            return monaco_u.set(e, r), r;
-        }(l)
-    ]), { monaco: w, jsonDefaults: b } = p, U = w.Uri.parse("inmemory://portweaver/".concat(l, ".").concat(s));
-    "json" === s ? b.setDiagnosticsOptions({
+            }).then((o)=>(monaco_d.set(e, o), o)).catch(()=>void 0);
+            return monaco_p.set(e, r), r;
+        }(v)
+    ]), { monaco: W, jsonDefaults: j } = w, E = W.Uri.parse("inmemory://portweaver/".concat(v, ".").concat(g));
+    "json" === g ? j.setDiagnosticsOptions({
         allowComments: !1,
         enableSchemaRequest: !1,
-        schemas: g ? [
-            ...monaco_m.entries()
+        schemas: M ? [
+            ...monaco_d.entries()
         ].map((e)=>{
             let [o, r] = e;
             return {
@@ -1582,101 +1672,32 @@ async function createFrpConfigEditor(o, n, a, l, s) {
                     "inmemory://portweaver/".concat(o, ".json")
                 ],
                 schema: r,
-                uri: monaco_i[o]
+                uri: SCHEMA_URLS[o]
             };
         }) : [],
         validate: !0
-    }) : "yaml" === s ? await monaco_y(p) : g && function(e, o, r) {
-        let t = "".concat(o, ":").concat(String(r.$id || "frp"));
-        if (monaco_d.has(t)) return;
-        monaco_d.add(t), monaco_d.has(o) || (monaco_d.add(o), e.languages.register({
-            id: o
-        }), e.languages.setMonarchTokensProvider(o, {
-            tokenizer: {
-                root: [
-                    [
-                        /#.*$/,
-                        "comment"
-                    ],
-                    [
-                        /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/,
-                        "string"
-                    ],
-                    [
-                        /\b(?:true|false)\b/,
-                        "keyword"
-                    ],
-                    [
-                        /\b\d+(?:\.\d+)?\b/,
-                        "number"
-                    ],
-                    [
-                        /[A-Za-z_][\w-]*(?=\s*(?:=|:))/,
-                        "type"
-                    ]
-                ]
-            }
-        }));
-        let n = r.properties || {};
-        e.languages.registerCompletionItemProvider(o, {
-            triggerCharacters: [
-                ".",
-                "-"
-            ],
-            provideCompletionItems: (r, t)=>({
-                    suggestions: Object.entries(n).map((r)=>{
-                        var n, a;
-                        let [l, s] = r;
-                        return {
-                            label: l,
-                            kind: e.languages.CompletionItemKind.Property,
-                            documentation: s.description || "FRP configuration option",
-                            insertText: "toml" === o ? "".concat(l, " = ").concat(JSON.stringify(null != (n = s.default) ? n : "")) : "".concat(l, ": ").concat(JSON.stringify(null != (a = s.default) ? a : "")),
-                            insertTextRules: e.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                            range: {
-                                startLineNumber: t.lineNumber,
-                                endLineNumber: t.lineNumber,
-                                startColumn: t.column,
-                                endColumn: t.column
-                            }
-                        };
-                    })
-                })
-        });
-    }(w, "toml", g);
-    let M = w.editor.createModel(n(), s, U);
-    w.editor.setTheme(!function() {
-        for (let e of [
-            document.body,
-            document.documentElement
-        ]){
-            let o = function(e) {
-                var o;
-                let r = null == (o = getComputedStyle(e).backgroundColor.match(/\d+/g)) ? void 0 : o.map(Number);
-                if (r && !(r.length < 3) && 0 !== r[3]) return 0.299 * r[0] + 0.587 * r[1] + 0.114 * r[2];
-            }(e);
-            if (void 0 !== o) return o < 128;
-        }
-        return matchMedia("(prefers-color-scheme: dark)").matches;
-    }() ? "vs" : "vs-dark");
-    let W = w.editor.create(o, {
+    }) : "yaml" === g ? await configureYaml(w, monaco_d) : M && registerSchemaCompletions(W, "toml", M);
+    let b = W.editor.createModel(h(), g, E);
+    W.editor.setTheme(prefersDarkTheme() ? "vs-dark" : "vs");
+    let y = W.editor.create(c, {
         automaticLayout: !0,
         minimap: {
             enabled: !1
         },
-        model: M,
+        model: b,
         scrollBeyondLastLine: !1,
         tabSize: 2,
         wordWrap: "on"
-    }), C = M.onDidChangeContent(()=>a(M.getValue()));
+    }), _ = b.onDidChangeContent(()=>f(b.getValue()));
     return {
-        getValue: ()=>M.getValue(),
-        setValue: (e)=>M.setValue(e),
+        getValue: ()=>b.getValue(),
+        setValue: (e)=>b.setValue(e),
         dispose: ()=>{
-            C.dispose(), W.dispose(), M.dispose();
+            _.dispose(), y.dispose(), b.dispose();
         }
     };
 }
+
 
 ;// CONCATENATED MODULE: ./components/FrpExternalConfigEditor.tsx
 
@@ -1753,8 +1774,8 @@ class FrpExternalConfigEditor_n extends L.form.Value {
                 return;
             }
             t.editor = i, t.editorFormat = a, t.textarea.style.display = "none", t.editorContainer.style.display = "block", t.editorSettings.style.display = "none", this.setMessage(e, "");
-        }).catch(()=>{
-            this.getSession(e) === t && t.editorRequest === d && (t.editorButton.disabled = !1, t.editorSource.disabled = !1, t.editorSettings.style.display = "", t.textarea.style.display = "", t.editorContainer.style.display = "none", this.setMessage(e, _("Advanced editor could not be loaded; using the plain text editor."), "#c60"));
+        }).catch((i)=>{
+            console.error("Failed to load advanced editor:", i), i instanceof Error && i.cause && console.error("Caused by:", i.cause), this.getSession(e) === t && t.editorRequest === d && (t.editorButton.disabled = !1, t.editorSource.disabled = !1, t.editorSettings.style.display = "", t.textarea.style.display = "", t.editorContainer.style.display = "none", this.setMessage(e, _("Advanced editor could not be loaded; using the plain text editor."), "#c60"));
         });
     }
     enableEditor(e) {

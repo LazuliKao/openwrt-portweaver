@@ -250,7 +250,11 @@ class FrpExternalConfigEditor extends L.form.Value {
         session.editorSettings.style.display = "none";
         this.setMessage(sectionId, "");
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        console.error("Failed to load advanced editor:", error);
+        if (error instanceof Error && error.cause) {
+          console.error("Caused by:", error.cause);
+        }
         if (
           this.getSession(sectionId) !== session ||
           session.editorRequest !== request
