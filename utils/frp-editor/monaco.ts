@@ -65,11 +65,12 @@ type MonacoCandidate = {
   editorWorkerUrl: string;
   jsonWorkerUrl: string;
   yamlModuleUrl: string;
+  yamlWorkerSourceUrl?: string;
   yamlWorkerUrl: string;
   styleUrl: string;
 };
 
-type MonacoWorkerFactory = () => Worker;
+type MonacoWorkerFactory = () => Worker | Promise<Worker>;
 
 type MonacoYamlOptions = {
   completion: boolean;
@@ -158,6 +159,10 @@ const MONACO_CANDIDATES: MonacoCandidate[] = [
       id === "unpkg"
         ? `${baseUrl}/monaco-yaml@${MONACO_YAML_VERSION}/yaml.worker.js?module`
         : `${baseUrl}/monaco-yaml@${MONACO_YAML_VERSION}/yaml.worker.js/+esm`,
+    yamlWorkerSourceUrl:
+      id === "unpkg"
+        ? undefined
+        : `${baseUrl}/monaco-yaml@${MONACO_YAML_VERSION}/yaml.worker.js/+esm`,
     styleUrl: `${baseUrl}/@node-projects/monaco-editor-esm@${MONACO_ESM_VERSION}/min/vs/editor/editor.main.css`,
   })),
 ];
@@ -177,7 +182,11 @@ function loadStylesheet(url: string): Promise<HTMLLinkElement> {
 }
 
 function createModuleWorker(url: string): Worker {
-  const blob = new Blob([`import ${JSON.stringify(url)};`], {
+  return createModuleWorkerFromSource(`import ${JSON.stringify(url)};`);
+}
+
+function createModuleWorkerFromSource(source: string): Worker {
+  const blob = new Blob([source], {
     type: "application/javascript",
   });
   const blobUrl = URL.createObjectURL(blob);
@@ -186,6 +195,48 @@ function createModuleWorker(url: string): Worker {
   } finally {
     URL.revokeObjectURL(blobUrl);
   }
+}
+
+function createJsdelivrYamlWorker(candidate: MonacoCandidate): Promise<Worker> {
+  const sourceUrl = candidate.yamlWorkerSourceUrl;
+  if (!sourceUrl) return Promise.resolve(createModuleWorker(candidate.yamlWorkerUrl));
+
+  return withTimeout(
+    fetch(sourceUrl)
+      .then((response) => {
+        if (!response.ok)
+          throw new Error(`Unable to load YAML worker from ${candidate.name}.`);
+        return response.text();
+      })
+      .then((source) => {
+        const workerManagerBridge = `data:text/javascript;charset=utf-8,${encodeURIComponent(
+          `import { initialize as initializeEditorWorker } from ${JSON.stringify(candidate.editorWorkerUrl)}; export function initialize(create) { self.onmessage = () => { initializeEditorWorker((ctx, createData) => Object.create(create(ctx, createData))); }; }`,
+        )}`;
+        const withPinnedWorker = source.replace(
+          /(from\s*["'])\/npm\/monaco-worker-manager@[^"']+\/worker\/\+esm(["'])/,
+          `$1${workerManagerBridge}$2`,
+        );
+        if (withPinnedWorker === source)
+          throw new Error("jsDelivr YAML worker dependency was not found.");
+
+        // jsDelivr's transformed module uses root-relative imports. A blob
+        // worker has the LuCI origin, so make those imports point back to the
+        // selected jsDelivr endpoint before starting it.
+        const origin = new URL(sourceUrl).origin;
+        const workerSource = withPinnedWorker.replace(
+          /(["'])\/(npm|node)\//g,
+          `$1${origin}/$2/`,
+        );
+        return createModuleWorkerFromSource(workerSource);
+      }),
+    MONACO_CDN_TIMEOUT,
+  );
+}
+
+function createYamlWorker(candidate: MonacoCandidate): Worker | Promise<Worker> {
+  return candidate.yamlWorkerSourceUrl
+    ? createJsdelivrYamlWorker(candidate)
+    : createModuleWorker(candidate.yamlWorkerUrl);
 }
 
 function configureWorkers(
@@ -241,7 +292,7 @@ function loadCandidate(candidate: MonacoCandidate): Promise<LoadedMonaco> {
   configureWorkers(
     () => createModuleWorker(candidate.editorWorkerUrl),
     () => createModuleWorker(candidate.jsonWorkerUrl),
-    () => createModuleWorker(candidate.yamlWorkerUrl),
+    () => createYamlWorker(candidate),
   );
   const stylesheet = loadStylesheet(candidate.styleUrl);
   const module = importRemoteModule<
@@ -267,7 +318,7 @@ function loadCandidate(candidate: MonacoCandidate): Promise<LoadedMonaco> {
       jsonDefaults: defaults,
       createEditorWorker: () => createModuleWorker(candidate.editorWorkerUrl),
       createJsonWorker: () => createModuleWorker(candidate.jsonWorkerUrl),
-      createYamlWorker: () => createModuleWorker(candidate.yamlWorkerUrl),
+      createYamlWorker: () => createYamlWorker(candidate),
       loadYamlModule: () => {
         yamlModulePromise ??= withTimeout(
           importRemoteModule<MonacoYamlModule>(candidate.yamlModuleUrl),
