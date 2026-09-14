@@ -45,13 +45,17 @@ type Hover = {
 };
 
 type DocumentSession = {
+  schemaUrl: string;
+  schema?: Record<string, unknown>;
+  getText(): string;
+  getVersion(): number;
   onDiagnostics(diagnostics: LspDiagnostic[]): void;
 };
 
 const MARKER_OWNER = "portweaver-taplo";
 
 class TaploClient {
-  private readonly worker: Worker;
+  private worker: Worker;
   private readonly documents = new Map<string, DocumentSession>();
   private readonly pending = new Map<
     RpcId,
@@ -59,25 +63,40 @@ class TaploClient {
   >();
   private nextId = 1;
   private ready: Promise<void>;
+  private readyResolve: (() => void) | undefined;
+  private readyReject: ((error: Error) => void) | undefined;
   private initialized: Promise<void> | undefined;
+  private configured: Promise<void>;
+  private configuredResolve: (() => void) | undefined;
+  private lastSchemas: Record<string, unknown> = {};
+  private isDisposed = false;
+  private isRecovering = false;
+  private recoveryPromise: Promise<void> | undefined;
 
   constructor() {
-    this.worker = new Worker(new URL("./taplo-worker.ts", import.meta.url), {
-      name: "portweaver-taplo",
+    this.configured = new Promise<void>((resolve) => {
+      this.configuredResolve = resolve;
     });
-    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) =>
-      this.handleWorkerMessage(event.data);
-    this.worker.onerror = () =>
-      this.rejectPending(new Error("Taplo worker failed."));
     this.ready = new Promise<void>((resolve, reject) => {
       this.readyResolve = resolve;
       this.readyReject = reject;
     });
+    this.worker = this.createWorker();
     this.sendWorker({ type: "initialize" });
   }
 
-  private readyResolve: (() => void) | undefined;
-  private readyReject: ((error: Error) => void) | undefined;
+  private createWorker(): Worker {
+    const worker = new Worker(new URL("./taplo-worker.ts", import.meta.url), {
+      name: "portweaver-taplo",
+    });
+    worker.onmessage = (event: MessageEvent<WorkerResponse>) =>
+      this.handleWorkerMessage(event.data);
+    worker.onerror = (event: ErrorEvent) => {
+      console.error("[Taplo Worker onerror]", event.message || event);
+      this.triggerRecovery("worker onerror");
+    };
+    return worker;
+  }
 
   private sendWorker(message: unknown): void {
     this.worker.postMessage(message);
@@ -93,6 +112,7 @@ class TaploClient {
       console.error("[Taplo Worker Error]", response.message);
       this.readyReject?.(error);
       this.rejectPending(error);
+      this.triggerRecovery(response.message);
       return;
     }
     console.log(
@@ -102,11 +122,6 @@ class TaploClient {
     );
     this.handleServerMessage(response.message);
   }
-
-  private configuredResolve: (() => void) | undefined;
-  private readonly configured = new Promise<void>((resolve) => {
-    this.configuredResolve = resolve;
-  });
 
   private handleServerMessage(message: RpcMessage): void {
     if (message.method === "textDocument/publishDiagnostics") {
@@ -128,7 +143,7 @@ class TaploClient {
         // fetches them (e.g. schemastore.org) inside the lock, blocking ALL
         // other handlers (completion, hover, didOpen) until the HTTP request
         // finishes — causing the timeout.
-        this.notify({
+        void this.notify({
           jsonrpc: "2.0",
           id: message.id,
           result: (params?.items ?? []).map(() => ({
@@ -147,7 +162,7 @@ class TaploClient {
 
       // Taplo can request optional client capabilities. This editor has no
       // workspace, so acknowledge unsupported requests instead of stalling it.
-      this.notify({ jsonrpc: "2.0", id: message.id, result: null });
+      void this.notify({ jsonrpc: "2.0", id: message.id, result: null });
       return;
     }
 
@@ -169,7 +184,118 @@ class TaploClient {
     this.pending.clear();
   }
 
-  private notify(message: RpcMessage): void {
+  private triggerRecovery(reason: string): void {
+    if (this.isDisposed || this.isRecovering) return;
+    console.warn(
+      `[Taplo Client] Triggering self-healing recovery (reason: ${reason})...`,
+    );
+    void this.recover().catch((err) => {
+      console.error("[Taplo Client] Self-healing recovery failed:", err);
+    });
+  }
+
+  private async recover(): Promise<void> {
+    if (this.isDisposed) return;
+    if (this.recoveryPromise) return this.recoveryPromise;
+
+    this.recoveryPromise = (async () => {
+      this.isRecovering = true;
+      console.log(
+        "[Taplo Client] Initiating worker replacement and state restoration...",
+      );
+
+      // 1. Terminate old dead worker
+      try {
+        this.worker.terminate();
+      } catch (err) {
+        console.warn("[Taplo Client] Failed to terminate worker:", err);
+      }
+
+      // 2. Reject all in-flight pending requests
+      this.rejectPending(new Error("Taplo worker crashed and is restarting."));
+
+      // 3. Reset handshake promises
+      this.configured = new Promise<void>((resolve) => {
+        this.configuredResolve = resolve;
+      });
+      this.ready = new Promise<void>((resolve, reject) => {
+        this.readyResolve = resolve;
+        this.readyReject = reject;
+      });
+      this.initialized = undefined;
+
+      // 4. Create new worker
+      this.worker = this.createWorker();
+      this.sendWorker({ type: "initialize" });
+
+      // 5. Initialize LSP
+      await this.initialize();
+
+      // 6. Restore schemas
+      if (Object.keys(this.lastSchemas).length > 0) {
+        this.sendWorker({ type: "setSchemas", schemas: this.lastSchemas });
+      }
+
+      // 7. Re-open all tracked active documents
+      for (const [uri, doc] of this.documents.entries()) {
+        const text = doc.getText();
+        const schemaUrl = doc.schemaUrl;
+
+        await this.notify({
+          jsonrpc: "2.0",
+          method: "textDocument/didOpen",
+          params: {
+            textDocument: {
+              uri,
+              languageId: "toml",
+              version: doc.getVersion(),
+              text,
+            },
+          },
+        });
+
+        await this.notify({
+          jsonrpc: "2.0",
+          method: "taplo/associateSchema",
+          params: {
+            documentUri: uri,
+            schemaUri: schemaUrl,
+            rule: { url: uri },
+            priority: 10,
+          },
+        });
+
+        await this.notify({
+          jsonrpc: "2.0",
+          method: "taplo/associateSchema",
+          params: {
+            documentUri: uri,
+            schemaUri: schemaUrl,
+            rule: { regex: ".*" },
+            priority: 10,
+          },
+        });
+      }
+
+      console.log(
+        `[Taplo Client] Self-healing recovery finished successfully. Restored ${this.documents.size} document(s).`,
+      );
+    })().finally(() => {
+      this.isRecovering = false;
+      this.recoveryPromise = undefined;
+    });
+
+    return this.recoveryPromise;
+  }
+
+  private async notify(message: RpcMessage): Promise<void> {
+    if (this.recoveryPromise && !this.isRecovering) {
+      try {
+        await this.recoveryPromise;
+      } catch {
+        return;
+      }
+    }
     console.log(
       "[Taplo Client -> Worker]",
       message.method || `reply(${message.id})`,
@@ -178,7 +304,14 @@ class TaploClient {
     this.sendWorker({ type: "send", message });
   }
 
-  private request(method: string, params: unknown): Promise<unknown> {
+  private async request(method: string, params: unknown): Promise<unknown> {
+    if (this.recoveryPromise && !this.isRecovering) {
+      try {
+        await this.recoveryPromise;
+      } catch {
+        return null;
+      }
+    }
     const id = this.nextId++;
     const timeoutMs = 5000;
     return new Promise<unknown>((resolve, reject) => {
@@ -198,7 +331,10 @@ class TaploClient {
           reject(err);
         },
       });
-      this.notify({ jsonrpc: "2.0", id, method, params });
+      this.sendWorker({
+        type: "send",
+        message: { jsonrpc: "2.0", id, method, params },
+      });
     });
   }
 
@@ -220,7 +356,7 @@ class TaploClient {
           configurationSection: "evenBetterToml",
         },
       });
-      this.notify({ jsonrpc: "2.0", method: "initialized", params: {} });
+      await this.notify({ jsonrpc: "2.0", method: "initialized", params: {} });
       // Wait for Taplo's update_configuration handshake to complete,
       // ensuring its workspaces write lock is fully released before opening documents.
       await Promise.race([
@@ -233,6 +369,7 @@ class TaploClient {
   }
 
   setSchemas(schemas: Record<string, unknown>): void {
+    this.lastSchemas = { ...this.lastSchemas, ...schemas };
     this.sendWorker({ type: "setSchemas", schemas });
   }
 
@@ -243,6 +380,13 @@ class TaploClient {
     text: string,
     session: DocumentSession,
   ): Promise<void> {
+    if (this.recoveryPromise && !this.isRecovering) {
+      try {
+        await this.recoveryPromise;
+      } catch {
+        // ignore
+      }
+    }
     await this.initialize();
     const fileSchemaUrl = `file:///schemas/${schemaUrl.split("/").pop() ?? "schema.json"}`;
     if (schema) {
@@ -254,7 +398,7 @@ class TaploClient {
     this.documents.set(uri, session);
 
     // 1. Send didOpen FIRST so the document is stored in workspaces
-    this.notify({
+    await this.notify({
       jsonrpc: "2.0",
       method: "textDocument/didOpen",
       params: {
@@ -264,7 +408,7 @@ class TaploClient {
 
     // 2. Associate schema AFTER didOpen (so didOpen's retain doesn't wipe manual association)
     console.debug("[Taplo] Associating schema:", { uri, schemaUrl });
-    this.notify({
+    await this.notify({
       jsonrpc: "2.0",
       method: "taplo/associateSchema",
       params: {
@@ -274,7 +418,7 @@ class TaploClient {
         priority: 10,
       },
     });
-    this.notify({
+    await this.notify({
       jsonrpc: "2.0",
       method: "taplo/associateSchema",
       params: {
@@ -287,7 +431,7 @@ class TaploClient {
   }
 
   changeDocument(uri: string, version: number, text: string): void {
-    this.notify({
+    void this.notify({
       jsonrpc: "2.0",
       method: "textDocument/didChange",
       params: {
@@ -299,7 +443,7 @@ class TaploClient {
 
   closeDocument(uri: string): void {
     this.documents.delete(uri);
-    this.notify({
+    void this.notify({
       jsonrpc: "2.0",
       method: "textDocument/didClose",
       params: { textDocument: { uri } },
@@ -318,6 +462,18 @@ class TaploClient {
       textDocument: { uri },
       position,
     });
+  }
+
+  dispose(): void {
+    this.isDisposed = true;
+    try {
+      this.sendWorker({ type: "dispose" });
+      this.worker.terminate();
+    } catch {
+      // ignore
+    }
+    this.rejectPending(new Error("Taplo client disposed."));
+    this.documents.clear();
   }
 }
 
@@ -384,6 +540,10 @@ export async function attachTaplo(
   const taplo = getClient();
 
   await taplo.openDocument(uri, schemaUrl, schema, model.getValue(), {
+    schemaUrl,
+    schema,
+    getText: () => model.getValue(),
+    getVersion: () => version,
     onDiagnostics: (diagnostics) => {
       console.debug("[Taplo] Received diagnostics:", diagnostics);
       monaco.editor.setModelMarkers(
@@ -444,42 +604,50 @@ export async function attachTaplo(
         _context,
         _token,
       ) => {
-        const lspPos = {
-          line: position.lineNumber - 1,
-          character: position.column - 1,
-        };
-        const result = await taplo.completion(uri, lspPos);
-        const rawItems = completionItems(result);
-        if (rawItems.length > 0) {
-          const word = completionModel.getWordUntilPosition(position);
-          const defaultRange = {
-            startLineNumber: position.lineNumber,
-            startColumn: word.startColumn,
-            endLineNumber: position.lineNumber,
-            endColumn: word.endColumn,
+        try {
+          const lspPos = {
+            line: position.lineNumber - 1,
+            character: position.column - 1,
           };
-          return {
-            suggestions: rawItems.map((item) => {
-              const textEdit = item.textEdit;
-              return {
-                label: completionLabel(item),
-                detail: item.detail,
-                documentation: markdownText(item.documentation),
-                kind:
-                  item.kind !== undefined
-                    ? item.kind
-                    : monaco.languages.CompletionItemKind.Property,
-                insertText:
-                  textEdit?.newText || item.insertText || completionLabel(item),
-                insertTextRules:
-                  item.insertTextFormat === 2
-                    ? monaco.languages.CompletionItemInsertTextRule
-                        .InsertAsSnippet
-                    : undefined,
-                range: textEdit ? toMonacoRange(textEdit.range) : defaultRange,
-              };
-            }),
-          };
+          const result = await taplo.completion(uri, lspPos);
+          const rawItems = completionItems(result);
+          if (rawItems.length > 0) {
+            const word = completionModel.getWordUntilPosition(position);
+            const defaultRange = {
+              startLineNumber: position.lineNumber,
+              startColumn: word.startColumn,
+              endLineNumber: position.lineNumber,
+              endColumn: word.endColumn,
+            };
+            return {
+              suggestions: rawItems.map((item) => {
+                const textEdit = item.textEdit;
+                return {
+                  label: completionLabel(item),
+                  detail: item.detail,
+                  documentation: markdownText(item.documentation),
+                  kind:
+                    item.kind !== undefined
+                      ? item.kind
+                      : monaco.languages.CompletionItemKind.Property,
+                  insertText:
+                    textEdit?.newText ||
+                    item.insertText ||
+                    completionLabel(item),
+                  insertTextRules:
+                    item.insertTextFormat === 2
+                      ? monaco.languages.CompletionItemInsertTextRule
+                          .InsertAsSnippet
+                      : undefined,
+                  range: textEdit
+                    ? toMonacoRange(textEdit.range)
+                    : defaultRange,
+                };
+              }),
+            };
+          }
+        } catch (error) {
+          console.warn("[Taplo Completion Error]", error);
         }
 
         return { suggestions: [] };
@@ -488,18 +656,23 @@ export async function attachTaplo(
   );
   const hoverProvider = monaco.languages.registerHoverProvider("toml", {
     provideHover: async (_model, position) => {
-      const result = (await taplo.hover(uri, {
-        line: position.lineNumber - 1,
-        character: position.column - 1,
-      })) as Hover | null;
-      const contents = result?.contents
-        ?.map(markdownText)
-        .filter((content): content is string => Boolean(content));
-      if (!contents?.length) return null;
-      return {
-        contents: contents.map((value) => ({ value })),
-        range: result?.range ? toMonacoRange(result.range) : undefined,
-      };
+      try {
+        const result = (await taplo.hover(uri, {
+          line: position.lineNumber - 1,
+          character: position.column - 1,
+        })) as Hover | null;
+        const contents = result?.contents
+          ?.map(markdownText)
+          .filter((content): content is string => Boolean(content));
+        if (!contents?.length) return null;
+        return {
+          contents: contents.map((value) => ({ value })),
+          range: result?.range ? toMonacoRange(result.range) : undefined,
+        };
+      } catch (error) {
+        console.warn("[Taplo Hover Error]", error);
+        return null;
+      }
     },
   });
 

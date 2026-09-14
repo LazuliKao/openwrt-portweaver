@@ -249,6 +249,8 @@ class FrpExternalConfigEditor extends L.form.Value {
         session.editorContainer.style.display = "block";
         session.editorSettings.style.display = "none";
         this.setMessage(sectionId, "");
+        // Focus editor so browser extensions (like Vimium) switch to input/insert mode
+        editor.focus();
       })
       .catch((error: unknown) => {
         console.error("Failed to load advanced editor:", error);
@@ -372,6 +374,9 @@ class FrpExternalConfigEditor extends L.form.Value {
     validateButton.onclick = () => this.validateContent(sectionId);
     saveButton.onclick = () => this.saveFile(sectionId, false);
     saveReloadButton.onclick = () => this.saveFile(sectionId, true);
+    editorContainer.addEventListener("pointerdown", () => {
+      session.editor?.focus();
+    });
 
     return (
       <div class="cbi-value-field">

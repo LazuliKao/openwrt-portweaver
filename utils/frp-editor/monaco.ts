@@ -200,9 +200,17 @@ export async function createFrpConfigEditor(
   });
   const listener = model.onDidChangeContent(() => onChange(model.getValue()));
 
+  container.setAttribute("role", "textbox");
+  container.setAttribute("aria-multiline", "true");
+  container.addEventListener("keydown", (event) => {
+    // Stop bubbling to prevent outer page shortcuts or extensions from intercepting typing
+    event.stopPropagation();
+  });
+
   return {
     getValue: () => model.getValue(),
     setValue: (value) => model.setValue(value),
+    focus: () => editor.focus(),
     dispose: () => {
       listener.dispose();
       taplo?.dispose();

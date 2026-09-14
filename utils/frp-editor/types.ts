@@ -80,5 +80,6 @@ export type MonacoGlobal = typeof globalThis & {
 export type MonacoTextEditor = {
   getValue(): string;
   setValue(value: string): void;
+  focus(): void;
   dispose(): void;
 };
