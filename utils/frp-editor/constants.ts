@@ -12,3 +12,16 @@ export const SCHEMA_URLS: Record<FrpEditorKind, string> = {
   frpc: `https://raw.githubusercontent.com/LazuliKao/frp-schemas/${SCHEMA_COMMIT}/frpc-schema.json`,
   frps: `https://raw.githubusercontent.com/LazuliKao/frp-schemas/${SCHEMA_COMMIT}/frps-schema.json`,
 };
+
+export const SCHEMA_CANDIDATE_URLS: Record<FrpEditorKind, string[]> = {
+  frpc: [
+    `https://cdn.jsdelivr.net/gh/LazuliKao/frp-schemas@${SCHEMA_COMMIT}/frpc-schema.json`,
+    `https://fastly.jsdelivr.net/gh/LazuliKao/frp-schemas@${SCHEMA_COMMIT}/frpc-schema.json`,
+    `https://raw.githubusercontent.com/LazuliKao/frp-schemas/${SCHEMA_COMMIT}/frpc-schema.json`,
+  ],
+  frps: [
+    `https://cdn.jsdelivr.net/gh/LazuliKao/frp-schemas@${SCHEMA_COMMIT}/frps-schema.json`,
+    `https://fastly.jsdelivr.net/gh/LazuliKao/frp-schemas@${SCHEMA_COMMIT}/frps-schema.json`,
+    `https://raw.githubusercontent.com/LazuliKao/frp-schemas/${SCHEMA_COMMIT}/frps-schema.json`,
+  ],
+};

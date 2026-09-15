@@ -16,35 +16,54 @@ export async function ensureYamlSyntax(loaded: LoadedMonaco): Promise<void> {
   if (registeredSyntaxApis.has(loaded.monaco)) return;
   registeredSyntaxApis.add(loaded.monaco);
 
-  if (!loaded.loadYamlSyntax) return;
-  try {
-    const syntax = await loaded.loadYamlSyntax();
-    if (!syntax) return;
+  let syntaxConf:
+    | Parameters<typeof loaded.monaco.languages.setLanguageConfiguration>[1]
+    | undefined;
+  let syntaxLanguage:
+    | Parameters<typeof loaded.monaco.languages.setMonarchTokensProvider>[1]
+    | undefined;
 
+  if (loaded.loadYamlSyntax) {
+    try {
+      const syntax = await loaded.loadYamlSyntax();
+      if (syntax?.conf) {
+        syntaxConf = syntax.conf as typeof syntaxConf;
+      }
+      if (syntax?.language) {
+        syntaxLanguage = syntax.language as typeof syntaxLanguage;
+      }
+    } catch {
+      // Ignore if network fails
+    }
+  }
+
+  try {
     loaded.monaco.languages.register({
       id: "yaml",
       extensions: [".yaml", ".yml"],
       aliases: ["YAML", "yaml", "YML", "yml"],
       mimetypes: ["application/x-yaml", "text/x-yaml"],
     });
-    if (syntax.conf) {
-      loaded.monaco.languages.setLanguageConfiguration(
-        "yaml",
-        syntax.conf as Parameters<
-          typeof loaded.monaco.languages.setLanguageConfiguration
-        >[1],
-      );
-    }
-    if (syntax.language) {
-      loaded.monaco.languages.setMonarchTokensProvider(
-        "yaml",
-        syntax.language as Parameters<
-          typeof loaded.monaco.languages.setMonarchTokensProvider
-        >[1],
-      );
+    loaded.monaco.languages.setLanguageConfiguration("yaml", {
+      wordPattern: /(-?\d*\.\d\w*)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g,
+      comments: { lineComment: "#" },
+      brackets: [
+        ["{", "}"],
+        ["[", "]"],
+      ],
+      autoClosingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: '"', close: '"' },
+        { open: "'", close: "'" },
+      ],
+      ...syntaxConf,
+    });
+    if (syntaxLanguage) {
+      loaded.monaco.languages.setMonarchTokensProvider("yaml", syntaxLanguage);
     }
   } catch {
-    // Ignore if syntax is already registered or network fails
+    // Ignore if already registered
   }
 }
 
@@ -80,7 +99,7 @@ export async function configureYaml(
   await ensureYamlSyntax(loaded);
 
   const schemasForYaml = [...schemas.entries()].map(([kind, schema]) => ({
-    fileMatch: [`inmemory://portweaver/${kind}-*.yaml`],
+    fileMatch: ["*"],
     schema,
     uri: SCHEMA_URLS[kind],
   }));

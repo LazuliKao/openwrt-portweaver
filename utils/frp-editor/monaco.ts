@@ -1,4 +1,9 @@
-import { MONACO_CDN_TIMEOUT, SCHEMA_URLS } from "./constants";
+import type * as Monaco from "monaco-editor";
+import {
+  MONACO_CDN_TIMEOUT,
+  SCHEMA_CANDIDATE_URLS,
+  SCHEMA_URLS,
+} from "./constants";
 import { loadStylesheet, prefersDarkTheme, withTimeout } from "./helpers";
 import {
   getProvider,
@@ -131,18 +136,49 @@ function loadSchema(
   const existing = schemaPromises.get(kind);
   if (existing) return existing;
 
-  const promise = fetch(SCHEMA_URLS[kind])
-    .then((response) => {
-      if (!response.ok) throw new Error("Unable to load the FRP schema.");
-      return response.json() as Promise<Record<string, unknown>>;
-    })
-    .then((schema) => {
-      schemas.set(kind, schema);
-      return schema;
-    })
-    .catch(() => undefined);
+  const candidateUrls = SCHEMA_CANDIDATE_URLS[kind] ?? [SCHEMA_URLS[kind]];
+  const promise = (async () => {
+    for (const url of candidateUrls) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const schema = (await response.json()) as Record<string, unknown>;
+          schemas.set(kind, schema);
+          return schema;
+        }
+      } catch {
+        // Try next candidate mirror
+      }
+    }
+    return undefined;
+  })();
+
   schemaPromises.set(kind, promise);
   return promise;
+}
+
+function shouldAutoTriggerSuggest(
+  model: Monaco.editor.ITextModel,
+  position: Monaco.Position,
+): boolean {
+  const lineContent = model.getLineContent(position.lineNumber);
+  const textBeforeCursor = lineContent.slice(0, position.column - 1);
+  const trimmed = textBeforeCursor.trim();
+
+  // 1. Empty line or indentation only (e.g. after Enter)
+  if (trimmed.length === 0) return true;
+
+  // 2. YAML list item slot: e.g. "  - " or "-"
+  if (/^\s*-\s*$/.test(textBeforeCursor)) return true;
+
+  // 3. Key-value separator with trailing space: e.g. "type: " or "name: " or "key = "
+  if (/:\s+$/.test(textBeforeCursor) || /=\s*$/.test(textBeforeCursor))
+    return true;
+
+  // 4. Structural openings: e.g. "[", "{", "[["
+  if (/[[{]\s*$/.test(textBeforeCursor)) return true;
+
+  return false;
 }
 
 export async function createFrpConfigEditor(
@@ -171,7 +207,7 @@ export async function createFrpConfigEditor(
       enableSchemaRequest: false,
       schemas: schema
         ? [...schemas.entries()].map(([schemaKind, value]) => ({
-            fileMatch: [`inmemory://portweaver/${schemaKind}-*.json`],
+            fileMatch: ["*"],
             schema: value,
             uri: SCHEMA_URLS[schemaKind],
           }))
@@ -191,14 +227,62 @@ export async function createFrpConfigEditor(
       : undefined;
   monaco.editor.setTheme(prefersDarkTheme() ? "vs-dark" : "vs");
   const editor = monaco.editor.create(container, {
+    acceptSuggestionOnEnter: "smart",
     automaticLayout: true,
     minimap: { enabled: false },
     model,
+    quickSuggestions: {
+      comments: "on",
+      other: "on",
+      strings: "on",
+    },
+    quickSuggestionsDelay: 0,
     scrollBeyondLastLine: false,
+    suggest: {
+      filterGraceful: true,
+      localityBonus: true,
+      preview: true,
+      shareSuggestSelections: true,
+      showFields: true,
+      showKeywords: true,
+      showProperties: true,
+      showSnippets: true,
+      showValues: true,
+      showWords: true,
+    },
+    suggestOnTriggerCharacters: true,
+    suggestSelection: "first",
+    tabCompletion: "on",
     tabSize: 2,
+    wordBasedSuggestions: "allDocuments",
     wordWrap: "on",
   });
-  const listener = model.onDidChangeContent(() => onChange(model.getValue()));
+
+  let suggestTimeout: number | undefined;
+  const listener = model.onDidChangeContent((e) => {
+    onChange(model.getValue());
+    if (e.isUndoing || e.isRedoing || e.isFlush) return;
+
+    if (suggestTimeout) clearTimeout(suggestTimeout);
+    suggestTimeout = window.setTimeout(() => {
+      const position = editor.getPosition();
+      if (position && shouldAutoTriggerSuggest(model, position)) {
+        editor.trigger("keyboard", "editor.action.triggerSuggest", {});
+      }
+    }, 25);
+  });
+
+  const keydownDisposable = editor.onKeyDown((e) => {
+    if (e.keyCode === monaco.KeyCode.Enter) {
+      if (suggestTimeout) clearTimeout(suggestTimeout);
+      suggestTimeout = window.setTimeout(() => {
+        const position = editor.getPosition();
+        if (position && shouldAutoTriggerSuggest(model, position)) {
+          editor.trigger("keyboard", "editor.action.triggerSuggest", {});
+        }
+      }, 30);
+    }
+  });
 
   container.setAttribute("role", "textbox");
   container.setAttribute("aria-multiline", "true");
@@ -212,7 +296,9 @@ export async function createFrpConfigEditor(
     setValue: (value) => model.setValue(value),
     focus: () => editor.focus(),
     dispose: () => {
+      if (suggestTimeout) clearTimeout(suggestTimeout);
       listener.dispose();
+      keydownDisposable.dispose();
       taplo?.dispose();
       editor.dispose();
       model.dispose();
