@@ -284,18 +284,26 @@ export async function createFrpConfigEditor(
     }
   });
 
-  container.setAttribute("role", "textbox");
-  container.setAttribute("aria-multiline", "true");
-  container.addEventListener("keydown", (event) => {
-    // Stop bubbling to prevent outer page shortcuts or extensions from intercepting typing
-    event.stopPropagation();
-  });
+  // Ensure focused elements in Monaco (such as .native-edit-context) satisfy Vimium's isEditable check
+  const onFocusIn = (e: FocusEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      !target.isContentEditable &&
+      target.tagName !== "TEXTAREA" &&
+      target.tagName !== "INPUT"
+    ) {
+      target.setAttribute("contenteditable", "true");
+    }
+  };
+  container.addEventListener("focusin", onFocusIn);
 
   return {
     getValue: () => model.getValue(),
     setValue: (value) => model.setValue(value),
     focus: () => editor.focus(),
     dispose: () => {
+      container.removeEventListener("focusin", onFocusIn);
       if (suggestTimeout) clearTimeout(suggestTimeout);
       listener.dispose();
       keydownDisposable.dispose();

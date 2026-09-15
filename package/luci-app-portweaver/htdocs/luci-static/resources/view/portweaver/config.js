@@ -2355,24 +2355,24 @@ function monaco_w(e, t) {
     let o = e.getLineContent(t.lineNumber).slice(0, t.column - 1);
     return !!(0 === o.trim().length || /^\s*-\s*$/.test(o) || /:\s+$/.test(o) || /=\s*$/.test(o) || /[[{]\s*$/.test(o));
 }
-async function createFrpConfigEditor(c, k, v, y, S) {
-    let b, M = arguments.length > 5 && void 0 !== arguments[5] ? arguments[5] : "esm", [E, W] = await Promise.all([
+async function createFrpConfigEditor(c, v, k, y, S) {
+    let E, b = arguments.length > 5 && void 0 !== arguments[5] ? arguments[5] : "esm", [M, W] = await Promise.all([
         function() {
-            var r, a, n;
-            let c, u, m, d, p, f, h, w, k = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : "esm", v = monaco_g.get(k);
-            if (v) return v;
-            let y = getProvider(k);
-            if (!y) return Promise.reject(Error("Unknown Monaco source: ".concat(k, ".")));
-            let S = (r = ()=>y.createEditorWorker(), a = ()=>y.createJsonWorker(), n = ()=>y.createYamlWorker(), m = (u = globalThis).MonacoEnvironment, u.MonacoEnvironment = _object_spread_props(_object_spread({}, m), {
-                getWorker: (e, t)=>"yaml" === t || "monaco-yaml/yaml.worker" === e ? n() : (null == m ? void 0 : m.getWorker) ? m.getWorker(e, t) : ("json" === t ? a : r)()
+            var r, a, s;
+            let c, u, m, d, p, f, h, w, v = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : "esm", k = monaco_g.get(v);
+            if (k) return k;
+            let y = getProvider(v);
+            if (!y) return Promise.reject(Error("Unknown Monaco source: ".concat(v, ".")));
+            let S = (r = ()=>y.createEditorWorker(), a = ()=>y.createJsonWorker(), s = ()=>y.createYamlWorker(), m = (u = globalThis).MonacoEnvironment, u.MonacoEnvironment = _object_spread_props(_object_spread({}, m), {
+                getWorker: (e, t)=>"yaml" === t || "monaco-yaml/yaml.worker" === e ? s() : (null == m ? void 0 : m.getWorker) ? m.getWorker(e, t) : ("json" === t ? a : r)()
             }), d = loadStylesheet(y.getStyleUrl()), p = y.loadModule(), f = y.loadJsonDefaults ? y.loadJsonDefaults().then((e)=>{
                 if (!e) throw Error("Monaco JSON support is unavailable.");
                 return e;
             }) : p.then((e)=>{
                 var t, o, r, a;
-                let s = null != (t = null == (r = e.languages) || null == (o = r.json) ? void 0 : o.jsonDefaults) ? t : null == (a = e.json) ? void 0 : a.jsonDefaults;
-                if (!s) throw Error("Monaco JSON support is unavailable.");
-                return s;
+                let n = null != (t = null == (r = e.languages) || null == (o = r.json) ? void 0 : o.jsonDefaults) ? t : null == (a = e.json) ? void 0 : a.jsonDefaults;
+                if (!n) throw Error("Monaco JSON support is unavailable.");
+                return n;
             }), h = y.loadYamlSyntax, w = Promise.all([
                 p,
                 f,
@@ -2394,18 +2394,18 @@ async function createFrpConfigEditor(c, k, v, y, S) {
                     cause: e
                 });
             }));
-            return monaco_g.set(k, S), S.catch(()=>{
-                monaco_g.get(k) === S && monaco_g.delete(k);
+            return monaco_g.set(v, S), S.catch(()=>{
+                monaco_g.get(v) === S && monaco_g.delete(v);
             }), S;
-        }(M),
+        }(b),
         function(e) {
             var t;
             let o = monaco_h.get(e);
             if (o) return o;
-            let s = null != (t = SCHEMA_CANDIDATE_URLS[e]) ? t : [
+            let n = null != (t = SCHEMA_CANDIDATE_URLS[e]) ? t : [
                 SCHEMA_URLS[e]
-            ], n = (async ()=>{
-                for (let t of s)try {
+            ], s = (async ()=>{
+                for (let t of n)try {
                     let o = await fetch(t);
                     if (o.ok) {
                         let t = await o.json();
@@ -2413,10 +2413,10 @@ async function createFrpConfigEditor(c, k, v, y, S) {
                     }
                 } catch (e) {}
             })();
-            return monaco_h.set(e, n), n;
+            return monaco_h.set(e, s), s;
         }(y)
-    ]), { monaco: j, jsonDefaults: C } = E, _ = "toml" === S ? j.Uri.parse("file:///workspace/".concat(y, "-").concat(monaco_f++, ".toml")) : j.Uri.parse("inmemory://portweaver/".concat(y, "-").concat(monaco_f++, ".").concat(S));
-    "json" === S ? C.setDiagnosticsOptions({
+    ]), { monaco: C, jsonDefaults: T } = M, j = "toml" === S ? C.Uri.parse("file:///workspace/".concat(y, "-").concat(monaco_f++, ".toml")) : C.Uri.parse("inmemory://portweaver/".concat(y, "-").concat(monaco_f++, ".").concat(S));
+    "json" === S ? T.setDiagnosticsOptions({
         allowComments: !1,
         enableSchemaRequest: !1,
         schemas: W ? [
@@ -2432,16 +2432,16 @@ async function createFrpConfigEditor(c, k, v, y, S) {
             };
         }) : [],
         validate: !0
-    }) : "yaml" === S ? await configureYaml(E, monaco_p) : registerTomlLanguage(j);
-    let D = j.editor.createModel(k(), S, _), O = "toml" === S ? await attachTaplo(j, D, SCHEMA_URLS[y], W) : void 0;
-    j.editor.setTheme(prefersDarkTheme() ? "vs-dark" : "vs");
-    let T = j.editor.create(c, {
+    }) : "yaml" === S ? await configureYaml(M, monaco_p) : registerTomlLanguage(C);
+    let _ = C.editor.createModel(v(), S, j), D = "toml" === S ? await attachTaplo(C, _, SCHEMA_URLS[y], W) : void 0;
+    C.editor.setTheme(prefersDarkTheme() ? "vs-dark" : "vs");
+    let O = C.editor.create(c, {
         acceptSuggestionOnEnter: "smart",
         automaticLayout: !0,
         minimap: {
             enabled: !1
         },
-        model: D,
+        model: _,
         quickSuggestions: {
             comments: "on",
             other: "on",
@@ -2467,25 +2467,26 @@ async function createFrpConfigEditor(c, k, v, y, S) {
         tabSize: 2,
         wordBasedSuggestions: "allDocuments",
         wordWrap: "on"
-    }), P = D.onDidChangeContent((e)=>{
-        v(D.getValue()), e.isUndoing || e.isRedoing || e.isFlush || (b && clearTimeout(b), b = window.setTimeout(()=>{
-            let e = T.getPosition();
-            e && monaco_w(D, e) && T.trigger("keyboard", "editor.action.triggerSuggest", {});
+    }), N = _.onDidChangeContent((e)=>{
+        k(_.getValue()), e.isUndoing || e.isRedoing || e.isFlush || (E && clearTimeout(E), E = window.setTimeout(()=>{
+            let e = O.getPosition();
+            e && monaco_w(_, e) && O.trigger("keyboard", "editor.action.triggerSuggest", {});
         }, 25));
-    }), J = T.onKeyDown((e)=>{
-        e.keyCode === j.KeyCode.Enter && (b && clearTimeout(b), b = window.setTimeout(()=>{
-            let e = T.getPosition();
-            e && monaco_w(D, e) && T.trigger("keyboard", "editor.action.triggerSuggest", {});
+    }), P = O.onKeyDown((e)=>{
+        e.keyCode === C.KeyCode.Enter && (E && clearTimeout(E), E = window.setTimeout(()=>{
+            let e = O.getPosition();
+            e && monaco_w(_, e) && O.trigger("keyboard", "editor.action.triggerSuggest", {});
         }, 30));
-    });
-    return c.setAttribute("role", "textbox"), c.setAttribute("aria-multiline", "true"), c.addEventListener("keydown", (e)=>{
-        e.stopPropagation();
-    }), {
-        getValue: ()=>D.getValue(),
-        setValue: (e)=>D.setValue(e),
-        focus: ()=>T.focus(),
+    }), U = (e)=>{
+        let t = e.target;
+        t && !t.isContentEditable && "TEXTAREA" !== t.tagName && "INPUT" !== t.tagName && t.setAttribute("contenteditable", "true");
+    };
+    return c.addEventListener("focusin", U), {
+        getValue: ()=>_.getValue(),
+        setValue: (e)=>_.setValue(e),
+        focus: ()=>O.focus(),
         dispose: ()=>{
-            b && clearTimeout(b), P.dispose(), J.dispose(), null == O || O.dispose(), T.dispose(), D.dispose();
+            c.removeEventListener("focusin", U), E && clearTimeout(E), N.dispose(), P.dispose(), null == D || D.dispose(), O.dispose(), _.dispose();
         }
     };
 }
