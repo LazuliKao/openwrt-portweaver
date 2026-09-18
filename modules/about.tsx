@@ -137,6 +137,14 @@ export default function (
                   <span>{versionInfo.wol_mode ? "✔" : "✘"}</span>
                   <span>{_("Wake-on-LAN")}</span>
                 </div>
+                <div style={featureBadgeStyle(!!versionInfo.rathole_client_mode)}>
+                  <span>{versionInfo.rathole_client_mode ? "✔" : "✘"}</span>
+                  <span>{_("Rathole Client")}</span>
+                </div>
+                <div style={featureBadgeStyle(!!versionInfo.rathole_server_mode)}>
+                  <span>{versionInfo.rathole_server_mode ? "✔" : "✘"}</span>
+                  <span>{_("Rathole Server")}</span>
+                </div>
               </div>
             </div>
           </>
@@ -185,6 +193,25 @@ export default function (
               <br />
               <span style={smallStyle}>{_("License: MIT")}</span>
             </div>
+            {(versionInfo?.rathole_client_mode ||
+              versionInfo?.rathole_server_mode) && (
+              <div>
+                <a
+                  href="https://github.com/rapiz1/rathole"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={linkStyle}
+                >
+                  rathole
+                </a>
+                <span style={smallStyle}>
+                  {" "}
+                  — {_("Secure, stable and high-performance reverse proxy")}
+                </span>
+                <br />
+                <span style={smallStyle}>{_("License: Apache-2.0")}</span>
+              </div>
+            )}
           </div>
         </div>
 
