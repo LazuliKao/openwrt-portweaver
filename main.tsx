@@ -117,69 +117,49 @@ export class main extends L.view {
     return m.render();
   }
 
-  override handleSave = async () => {
+  override handleSave = async (_ev?: Event) => {
     if (this.mapInstance) {
       await this.mapInstance.save();
     }
+    return L.uci.save();
   };
 
-  override handleReset = async () => {
+  override handleReset = async (_ev?: Event) => {
     if (this.mapInstance) {
       await this.mapInstance.reset();
     }
   };
 
-  override handleSaveApply = null as any;
+  override handleSaveApply = async (ev?: Event, mode: string | number = 0) => {
+    await this.handleSave(ev);
+    const uiChanges = (L as any).ui.changes;
+    if (uiChanges && typeof uiChanges.apply === "function") {
+      return uiChanges.apply(mode === "0" || mode === 0);
+    }
+    return L.uci.apply();
+  };
 
-  async handleSaveReload() {
+  async handleSaveRestart(ev?: Event) {
     try {
-      await this.handleSave();
-      await L.uci.save();
+      await this.handleSave(ev);
       await rpcClient.uciCommit("portweaver");
-      const result = await rpcClient.reloadConfig();
+      const res = await L.fs.exec("/etc/init.d/portweaver", ["restart"]);
+      if (res && res.code !== 0) {
+        throw new Error(res.stderr || res.stdout || `Exit code ${res.code}`);
+      }
       L.ui.addNotification(
         null,
-        <p>
-          {_("Config reloaded: %d project(s) restarted").format(result.changes)}
-        </p>,
+        <p>{_("Service restarted successfully")}</p>,
         "info",
       );
-      location.reload();
+      window.setTimeout(() => location.reload(), 1500);
     } catch (err: any) {
       L.ui.addNotification(
         null,
-        <p>{_("Failed to reload config: %s").format(err.toString())}</p>,
+        <p>{_("Failed to restart service: %s").format(err.toString())}</p>,
         "error",
       );
     }
-  }
-
-  async handleSaveRestart() {
-    await this.handleSave();
-    const uiChanges = (L as any).ui.changes;
-    const applyPromise =
-      uiChanges && typeof uiChanges.apply === "function"
-        ? uiChanges.apply(true)
-        : L.uci.apply();
-
-    return applyPromise.then(() => {
-      return L.fs
-        .exec("/etc/init.d/portweaver", ["restart"])
-        .then(() => {
-          L.ui.addNotification(
-            null,
-            <p>{_("Service restarted successfully")}</p>,
-            "info",
-          );
-        })
-        .catch((err: any) => {
-          L.ui.addNotification(
-            null,
-            <p>{_("Failed to restart service: %s").format(err.toString())}</p>,
-            "error",
-          );
-        });
-    });
   }
 
   addFooter(): DocumentFragment {
@@ -190,15 +170,15 @@ export class main extends L.view {
         <button
           type="button"
           class="cbi-button cbi-button-apply"
-          onclick={() => this.handleSaveReload()}
+          onclick={(ev: Event) => this.handleSaveApply(ev, 0)}
         >
-          {_("Save & Reload")}
+          {_("Save & Apply")}
         </button>
         <button
           type="button"
-          class="cbi-button cbi-button-apply"
+          class="cbi-button cbi-button-negative"
           style="margin-left: 8px;"
-          onclick={() => this.handleSaveRestart()}
+          onclick={(ev: Event) => this.handleSaveRestart(ev)}
         >
           {_("Save & Restart")}
         </button>
@@ -206,7 +186,7 @@ export class main extends L.view {
           type="button"
           class="cbi-button cbi-button-save"
           style="margin-left: 8px;"
-          onclick={() => this.handleSave()}
+          onclick={(ev: Event) => this.handleSave(ev)}
         >
           {_("Save")}
         </button>
@@ -214,7 +194,7 @@ export class main extends L.view {
           type="button"
           class="cbi-button cbi-button-reset"
           style="margin-left: 8px;"
-          onclick={() => this.handleReset()}
+          onclick={(ev: Event) => this.handleReset(ev)}
         >
           {_("Reset")}
         </button>
