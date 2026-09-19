@@ -59,8 +59,9 @@ export const DNS_PROVIDERS_CONFIG: Record<
   edgeone: { idLabel: "SecretId", secretLabel: "SecretKey", extParamLabel: "" },
   name_com: { idLabel: "username", secretLabel: "token", extParamLabel: "" },
 
-  // Providers NOT requiring DnsID (8 total)
+  // Providers NOT requiring DnsID (9 total)
   cloudflare: { idLabel: "", secretLabel: "Token", extParamLabel: "" },
+  desec: { idLabel: "", secretLabel: "API Token", extParamLabel: "" },
   namecheap: { idLabel: "", secretLabel: "Password", extParamLabel: "" },
   namesilo: { idLabel: "", secretLabel: "Password", extParamLabel: "" },
   vercel: { idLabel: "", secretLabel: "Token", extParamLabel: "Team ID" },
@@ -88,6 +89,7 @@ const DNS_PROVIDERS = [
   { value: "trafficroute", label: "TrafficRoute (Volcengine)" },
   { value: "spaceship", label: "Spaceship" },
   { value: "dnsla", label: "DNSLA" },
+  { value: "desec", label: "deSEC" },
   { value: "nowcn", label: "Nowcn (Era Networks)" },
   { value: "eranet", label: "Eranet" },
   { value: "gcore", label: "Gcore" },

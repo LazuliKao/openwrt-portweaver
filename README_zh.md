@@ -77,7 +77,7 @@ make package/luci-app-portweaver/compile V=s
 |--------|------|
 | 全局设置 | 服务开关、运行状态仪表板、重启服务 |
 | 端口转发 | 项目管理（单端口/多端口模式）、防火墙配置、FRP 集成 |
-| DDNS | 24 个 DNS 提供商、IPv4/IPv6 独立配置、Webhook 支持 |
+| DDNS | 25 个 DNS 提供商、IPv4/IPv6 独立配置、Webhook 支持 |
 | FRP 隧道 | FRP 客户端节点管理、代理统计 |
 | FRP 服务器 | FRP 服务器节点管理、仪表板配置 |
 | 系统日志 | 日志查看器（搜索/过滤/高亮/导出） |
