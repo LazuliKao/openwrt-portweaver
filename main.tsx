@@ -130,13 +130,27 @@ export class main extends L.view {
     }
   };
 
-  override handleSaveApply = async (ev?: Event, mode: string | number = 0) => {
-    await this.handleSave(ev);
-    const uiChanges = (L as any).ui.changes;
-    if (uiChanges && typeof uiChanges.apply === "function") {
-      return uiChanges.apply(mode === "0" || mode === 0);
+  override handleSaveApply = async (ev?: Event) => {
+    try {
+      await this.handleSave(ev);
+      await rpcClient.uciCommit("portweaver");
+      const result = await rpcClient.reloadConfig();
+      L.ui.addNotification(
+        null,
+        <p>
+          {_("Config reloaded: %d project(s) restarted").format(
+            result?.changes ?? 0,
+          )}
+        </p>,
+        "info",
+      );
+    } catch (err: any) {
+      L.ui.addNotification(
+        null,
+        <p>{_("Failed to reload config: %s").format(err.toString())}</p>,
+        "error",
+      );
     }
-    return L.uci.apply();
   };
 
   async handleSaveRestart(ev?: Event) {
@@ -152,7 +166,6 @@ export class main extends L.view {
         <p>{_("Service restarted successfully")}</p>,
         "info",
       );
-      window.setTimeout(() => location.reload(), 1500);
     } catch (err: any) {
       L.ui.addNotification(
         null,
@@ -170,7 +183,7 @@ export class main extends L.view {
         <button
           type="button"
           class="cbi-button cbi-button-apply"
-          onclick={(ev: Event) => this.handleSaveApply(ev, 0)}
+          onclick={(ev: Event) => this.handleSaveApply(ev)}
         >
           {_("Save & Apply")}
         </button>
@@ -186,7 +199,19 @@ export class main extends L.view {
           type="button"
           class="cbi-button cbi-button-save"
           style="margin-left: 8px;"
-          onclick={(ev: Event) => this.handleSave(ev)}
+          onclick={async (ev: Event) => {
+            try {
+              await this.handleSave(ev);
+              await rpcClient.uciCommit("portweaver");
+              L.ui.addNotification(
+                null,
+                <p>{_("Configuration saved successfully")}</p>,
+                "info",
+              );
+            } catch (err: any) {
+              L.ui.addNotification(null, <p>{err.toString()}</p>, "error");
+            }
+          }}
         >
           {_("Save")}
         </button>
@@ -194,7 +219,18 @@ export class main extends L.view {
           type="button"
           class="cbi-button cbi-button-reset"
           style="margin-left: 8px;"
-          onclick={(ev: Event) => this.handleReset(ev)}
+          onclick={async (ev: Event) => {
+            try {
+              await this.handleReset(ev);
+              L.ui.addNotification(
+                null,
+                <p>{_("Configuration reset successfully")}</p>,
+                "info",
+              );
+            } catch (err: any) {
+              L.ui.addNotification(null, <p>{err.toString()}</p>, "error");
+            }
+          }}
         >
           {_("Reset")}
         </button>
