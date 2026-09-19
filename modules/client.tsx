@@ -1,6 +1,7 @@
 import type {
   ActivityEvent,
   DdnsGlobalStatus,
+  ForwarderFailure,
   ForwarderStats,
   FrpcStatus,
   FrpsStatus,
@@ -377,6 +378,7 @@ export class Client {
       bytes_in: project.bytes_in,
       bytes_out: project.bytes_out,
       forwarders: project.forwarders,
+      failures: project.failures,
     }));
 
     this.frpStatus = this.buildFrpStatus(fullStatus);
@@ -412,6 +414,7 @@ export class Client {
         bytes_in: project.bytes_in ?? existing?.bytes_in,
         bytes_out: project.bytes_out ?? existing?.bytes_out,
         forwarders: project.forwarders ?? existing?.forwarders,
+        failures: project.failures ?? existing?.failures,
       } as ProjectStatus;
     });
 
@@ -504,11 +507,17 @@ export class Client {
       return [<span style="color: gray;">{_("N/A")}</span>];
     }
     const startupFailed = status.startup_status === "failed";
+    const startupPartial = status.startup_status === "partial";
+    const startupProblem = startupFailed || startupPartial;
     const statusColor =
-      status.status === "running" && !startupFailed ? "green" : "#dc3545";
+      status.status === "running" && !startupProblem
+        ? "green"
+        : startupPartial
+          ? "#d97706"
+          : "#dc3545";
     let errorMessage = null as string | null;
     if (
-      startupFailed &&
+      startupProblem &&
       status.error_code !== undefined &&
       status.error_code !== 0
     ) {
@@ -531,52 +540,60 @@ export class Client {
             style={`font-size: 1em; font-weight: 600; color: ${statusColor};`}
           >
             {translateStatus(
-              startupFailed ? "failed" : status.status || "unknown",
+              startupFailed
+                ? "failed"
+                : startupPartial
+                  ? "partial"
+                  : status.status || "unknown",
             )}
           </strong>
         </span>
       </div>,
     ];
 
-    if (errorMessage && status.status !== "stopped") {
+    if (errorMessage && (!status.failures || status.failures.length === 0)) {
       statusElements.push(
         <small style="color: #dc3545; margin-top: 0.3em;">
           {`\u26A0 ${errorMessage}`}
         </small>,
       );
-    } else {
-      const elements: any[] = [];
-      if ((status.active_ports || 0) > 0) {
-        elements.push(
-          <span>{_("Ports: %d").format(status.active_ports || 0)}</span>,
-        );
-      }
-      if ((status.active_sessions || 0) > 0) {
-        if (elements.length > 0) elements.push(<br />);
-        elements.push(
-          <span>{_("Sessions: %d").format(status.active_sessions || 0)}</span>,
-        );
-      }
-      if (status.bytes_in || 0 || status.bytes_out || 0) {
-        if (elements.length > 0) elements.push(<br />);
-        elements.push(
-          <span>
-            {"\u2193 " +
-              formatBytes(status.bytes_in || 0) +
-              " \u2191 " +
-              formatBytes(status.bytes_out || 0)}
-          </span>,
-        );
-      }
+    }
 
-      if (status.forwarders && status.forwarders.length > 0) {
-        if (elements.length > 0) elements.push(<br />);
-        elements.push(this.renderForwarderStats(status.forwarders));
-      }
+    const elements: any[] = [];
+    if ((status.active_ports || 0) > 0) {
+      elements.push(
+        <span>{_("Ports: %d").format(status.active_ports || 0)}</span>,
+      );
+    }
+    if ((status.active_sessions || 0) > 0) {
+      if (elements.length > 0) elements.push(<br />);
+      elements.push(
+        <span>{_("Sessions: %d").format(status.active_sessions || 0)}</span>,
+      );
+    }
+    if (status.bytes_in || 0 || status.bytes_out || 0) {
+      if (elements.length > 0) elements.push(<br />);
+      elements.push(
+        <span>
+          {"\u2193 " +
+            formatBytes(status.bytes_in || 0) +
+            " \u2191 " +
+            formatBytes(status.bytes_out || 0)}
+        </span>,
+      );
+    }
 
-      if (elements.length > 0) {
-        statusElements.push(<small>{elements}</small>);
-      }
+    if (status.forwarders && status.forwarders.length > 0) {
+      if (elements.length > 0) elements.push(<br />);
+      elements.push(this.renderForwarderStats(status.forwarders));
+    }
+    if (status.failures && status.failures.length > 0) {
+      if (elements.length > 0) elements.push(<br />);
+      elements.push(this.renderForwarderFailures(status.failures));
+    }
+
+    if (elements.length > 0) {
+      statusElements.push(<small>{elements}</small>);
     }
 
     return statusElements;
@@ -610,6 +627,20 @@ export class Client {
       <div
         style={`margin-top: 0.3em; padding: 0.3em; background: ${bgColor}; border-radius: 3px; max-height: 80px; overflow-y: auto;`}
       >
+        {rows}
+      </div>
+    );
+  }
+
+  private renderForwarderFailures(failures: ForwarderFailure[]): HTMLElement {
+    const rows = failures.map((failure) => (
+      <div style="padding: 0.15em 0; font-size: 0.9em; color: #dc3545;">
+        {`${failure.protocol.toUpperCase()} :${failure.local_port} - ${getErrorMessage(failure.error_code) || _("Unknown error")}`}
+      </div>
+    ));
+
+    return (
+      <div style="margin-top: 0.3em; padding: 0.3em; background: rgba(220, 53, 69, 0.08); border-radius: 3px;">
         {rows}
       </div>
     );

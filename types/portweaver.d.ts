@@ -17,6 +17,13 @@ export interface ForwarderStats {
   active_sessions?: number;
 }
 
+/** A canonical startup failure for a requested listener */
+export interface ForwarderFailure {
+  protocol: string;
+  local_port: number;
+  error_code: number;
+}
+
 export interface ProjectStatus {
   id?: number;
   /** UCI section name for index-independent matching */
@@ -32,6 +39,8 @@ export interface ProjectStatus {
   active_sessions?: number;
   /** Per-port statistics */
   forwarders?: ForwarderStats[];
+  /** Per-port listener startup failures */
+  failures?: ForwarderFailure[];
 }
 
 export interface FrpcStatus {
@@ -104,6 +113,7 @@ export interface FullStatusProject {
     bytes_out: number;
     active_sessions?: number;
   }>;
+  failures?: ForwarderFailure[];
 }
 
 export interface FullStatusFrpcNode {
