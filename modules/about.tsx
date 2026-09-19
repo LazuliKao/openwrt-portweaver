@@ -137,11 +137,15 @@ export default function (
                   <span>{versionInfo.wol_mode ? "✔" : "✘"}</span>
                   <span>{_("Wake-on-LAN")}</span>
                 </div>
-                <div style={featureBadgeStyle(!!versionInfo.rathole_client_mode)}>
+                <div
+                  style={featureBadgeStyle(!!versionInfo.rathole_client_mode)}
+                >
                   <span>{versionInfo.rathole_client_mode ? "✔" : "✘"}</span>
                   <span>{_("Rathole Client")}</span>
                 </div>
-                <div style={featureBadgeStyle(!!versionInfo.rathole_server_mode)}>
+                <div
+                  style={featureBadgeStyle(!!versionInfo.rathole_server_mode)}
+                >
                   <span>{versionInfo.rathole_server_mode ? "✔" : "✘"}</span>
                   <span>{_("Rathole Server")}</span>
                 </div>

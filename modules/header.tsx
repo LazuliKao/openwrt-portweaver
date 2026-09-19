@@ -36,13 +36,13 @@ export default function (
       tab_id,
       form.Value,
       "frp_config_root",
-      _("FRP Configuration Root"),
+      _("External Configuration Root"),
     );
     o.rmempty = false;
     o.default = "/etc/portweaver";
     o.placeholder = "/etc/portweaver";
     o.description = _(
-      "Trusted root for external FRPC and FRPS configuration files. Save and reload after changing this path before using file editor actions.",
+      "Trusted root for external FRP and Rathole configuration files. Save and reload after changing this path before using file editor actions.",
     );
     o.validate = (_sectionId: string, value: unknown) => {
       const path = String(value || "");

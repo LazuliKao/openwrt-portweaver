@@ -1,4 +1,5 @@
 import { LogViewerDialog } from "@/components/LogViewerDialog";
+import { addRatholeNodeConfigSource } from "@/components/RatholeConfigSource";
 import type { RatholeMode } from "@/types/portweaver/rathole";
 import { rpcClient } from "@/utils/rpc-client";
 
@@ -6,6 +7,7 @@ const form = L.form;
 
 class RatholeNodeStatus {
   private statusEl: HTMLElement | null = null;
+  private pollingTimer: number | null = null;
 
   constructor(
     private mode: RatholeMode,
@@ -26,7 +28,20 @@ class RatholeNodeStatus {
       });
   }
 
+  private startPolling(): void {
+    if (this.pollingTimer !== null) window.clearInterval(this.pollingTimer);
+    this.pollingTimer = window.setInterval(() => {
+      if (!this.statusEl?.isConnected) {
+        if (this.pollingTimer !== null) window.clearInterval(this.pollingTimer);
+        this.pollingTimer = null;
+        return;
+      }
+      this.refresh();
+    }, 5000);
+  }
+
   render(): HTMLElement {
+    if (this.pollingTimer !== null) window.clearInterval(this.pollingTimer);
     this.statusEl = <span>{_("Loading...")}</span>;
     const result = (
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
@@ -51,6 +66,7 @@ class RatholeNodeStatus {
       </div>
     );
     this.refresh();
+    window.setTimeout(() => this.startPolling(), 0);
     return result;
   }
 }
@@ -87,6 +103,7 @@ export default function rathole(
       .some((section) => section[".name"] !== id && section.name === text);
     return duplicate ? _("Node name must be unique") : true;
   };
+  addRatholeNodeConfigSource(nodes, mode);
   const endpoint = nodes.option(
     form.Value,
     mode === "client" ? "remote_addr" : "bind_addr",
@@ -97,6 +114,7 @@ export default function rathole(
   endpoint.rmempty = false;
   endpoint.placeholder =
     mode === "client" ? "example.com:2333" : "0.0.0.0:2333";
+  endpoint.depends("config_mode", "builtin");
   const token = nodes.option(
     form.Value,
     "default_token",
@@ -106,16 +124,18 @@ export default function rathole(
   token.description = _(
     "Each enabled service requires its own token or this default. TCP transport is not encrypted; use Noise on untrusted networks.",
   );
+  token.depends("config_mode", "builtin");
   const transport = nodes.option(form.ListValue, "transport", _("Transport"));
   transport.value("tcp", "TCP");
   transport.value("noise", "Noise (NK)");
   transport.default = "tcp";
+  transport.depends("config_mode", "builtin");
   const key = nodes.option(
     form.Value,
     mode === "client" ? "noise_remote_public_key" : "noise_local_private_key",
     mode === "client" ? _("Server Public Key") : _("Server Private Key"),
   );
-  key.depends("transport", "noise");
+  key.depends({ config_mode: "builtin", transport: "noise" });
   key.rmempty = false;
   key.password = mode === "server";
   const status = nodes.option(
@@ -152,7 +172,7 @@ export default function rathole(
     node.value(nodeName, nodeName);
   }
   node.description = _(
-    "Save newly created nodes before adding their services.",
+    "Save newly created nodes before adding their services. Services for nodes using external TOML are retained but inactive.",
   );
   const serviceName = services.option(
     form.Value,

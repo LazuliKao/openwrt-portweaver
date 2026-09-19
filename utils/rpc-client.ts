@@ -37,6 +37,12 @@ export interface FrpConfigResponse {
   error: string;
 }
 
+export interface RatholeConfigResponse {
+  success: boolean;
+  content: string;
+  error: string;
+}
+
 export function createRpcClient(rpc: typeof L.rpc) {
   const getRatholeStatus = rpc.declare<RatholeStatus>({
     object: "portweaver",
@@ -51,6 +57,30 @@ export function createRpcClient(rpc: typeof L.rpc) {
     object: "portweaver",
     method: "clear_rathole_logs",
     params: ["mode", "name"],
+  });
+  const readRatholeConfig = rpc.declare<
+    RatholeConfigResponse,
+    [RatholeMode, string]
+  >({
+    object: "portweaver",
+    method: "read_rathole_config",
+    params: ["mode", "path"],
+  });
+  const validateRatholeConfig = rpc.declare<
+    RatholeConfigResponse,
+    [RatholeMode, string]
+  >({
+    object: "portweaver",
+    method: "validate_rathole_config",
+    params: ["mode", "content"],
+  });
+  const writeRatholeConfig = rpc.declare<
+    RatholeConfigResponse,
+    [RatholeMode, string, string, boolean]
+  >({
+    object: "portweaver",
+    method: "write_rathole_config",
+    params: ["mode", "path", "content", "reload"],
   });
   const listProjects = rpc.declare<{ projects: ProjectStatus[] }>({
     object: "portweaver",
@@ -206,6 +236,9 @@ export function createRpcClient(rpc: typeof L.rpc) {
     getRatholeStatus,
     getRatholeInfo,
     clearRatholeLogs,
+    readRatholeConfig,
+    validateRatholeConfig,
+    writeRatholeConfig,
     clearFrpsLogs,
     getFrpsProxyStats,
     getFullStatus,
