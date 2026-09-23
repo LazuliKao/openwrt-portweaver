@@ -8,6 +8,7 @@ import header from "./modules/header";
 import logs from "./modules/logs";
 import ddns from "./modules/ddns";
 import nftables from "./modules/nftables";
+import eventLoops from "./modules/event-loops";
 import about from "./modules/about";
 import wol from "./modules/wol";
 import { rpcClient } from "./utils/rpc-client";
@@ -65,6 +66,7 @@ export class main extends L.view {
 
     s.tab("settings", _("Global Settings"));
     s.tab("projects", _("Port Forwarding"));
+    s.tab("event_loops", _("Event Loops"));
     const version = data[3] as VersionResponse | null;
     if (version?.rathole_client_mode)
       s.tab("rathole_client", _("Rathole Client"));
@@ -94,6 +96,7 @@ export class main extends L.view {
 
     header(m, s, client, "settings");
     config(m, s, client, "projects");
+    eventLoops(m, s, "event_loops");
     if (version?.rathole_client_mode) rathole(s, "client");
     if (version?.rathole_server_mode) rathole(s, "server");
     if (isFeatureEnabled("wol_mode")) {

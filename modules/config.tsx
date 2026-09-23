@@ -532,21 +532,18 @@ export default function (
         "advanced",
         form.ListValue,
         "app_forward_loop_mode",
-        _("Loop Mode"),
+        _("Event-loop Attachment"),
         _(
-          "Controls how event loop runtimes are shared among listeners. " +
-            "'per_project' (default): one runtime shared by all listeners in this project, balanced resource usage. " +
-            "'per_listener': each listener gets its own dedicated runtime, highest isolation but uses more memory (one thread per listener). " +
-            "'global': all projects share a single global runtime, lowest memory usage but no isolation between projects.",
+          "Selects where this project's listeners are attached. " +
+            "Project-shared uses one event loop for this project. " +
+            "Listener-dedicated gives every listener its own event loop and thread. " +
+            "Globally shared attaches listeners from all projects to one event loop.",
         ),
       );
       o.modalonly = true;
-      o.value("per_project", _("Per Project (default) - balanced"));
-      o.value(
-        "per_listener",
-        _("Per Listener - highest isolation, more memory"),
-      );
-      o.value("global", _("Global - lowest memory, no isolation"));
+      o.value("per_project", _("Project-shared (default)"));
+      o.value("per_listener", _("Listener-dedicated (highest isolation)"));
+      o.value("global", _("Globally shared (lowest memory)"));
       o.default = "per_project";
       o.depends("enable_app_forward", "1");
     }

@@ -185,6 +185,36 @@ export interface VersionResponse {
   backend_version: string;
 }
 
+export interface LoopTopologyListener {
+  protocol: string;
+  local_port: number;
+}
+
+export interface LoopTopologyProject {
+  id: number;
+  section_name: string;
+  listeners: LoopTopologyListener[];
+}
+
+export interface LoopTopologyRuntime {
+  runtime_id: number;
+  mode: "global" | "per_project" | "per_listener" | string;
+  state: "starting" | "running" | "stopping" | "stopped" | string;
+  reference_count: number;
+  listener_count: number;
+  project_count: number;
+  projects: LoopTopologyProject[];
+}
+
+export interface LoopTopologyResponse {
+  generation: number;
+  backend: string;
+  runtime_count: number;
+  project_count: number;
+  listener_count: number;
+  runtimes: LoopTopologyRuntime[];
+}
+
 // declare global {
 //   namespace LuCI {
 //     namespace form {
