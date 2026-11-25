@@ -2,14 +2,14 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=portweaver-lite
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
-PKG_SOURCE_DATE:=2026-09-20
-PKG_SOURCE_VERSION:=2b24169fb94d65bcff62928488065be73a62e923
+PKG_SOURCE_DATE:=2026-11-25
+PKG_SOURCE_VERSION:=ce993bd520b4b7f9d0cd44d310ce51350ee9eb76
 PKG_BUILD_DIR:=$(BUILD_DIR)/portweaver-$(PKG_SOURCE_VERSION)
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_SOURCE_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/LazuliKao/portweaver/tar.gz/$(PKG_SOURCE_VERSION)?
-PKG_HASH:=1a2ea4a46df26062a00b5d9b58e702eeef853873c7d4a4860b131d09215ea243
+PKG_HASH:=dca5e01c26c761196af44b2359b58c5a6da2ea2425ad1ebc4beb27ecd070c979
 
 PKG_LICENSE:=GPL-3.0
 PKG_LICENSE_FILES:=LICENSE
@@ -22,8 +22,10 @@ include $(INCLUDE_DIR)/package.mk
 
 # Zig configuration
 ZIG := $(STAGING_DIR_HOST)/bin/zig
+ZIG_VERSION := 0.17.1
+ZIG_DIST := zig-x86_64-linux-$(ZIG_VERSION)
 ZIG_TARGET := $(subst openwrt-,,$(GNU_TARGET_NAME))
-ZIG_OPTIMIZE ?= ReleaseSmall
+ZIG_OPTIMIZE ?= small
 
 define Package/portweaver-lite
   SECTION:=net
@@ -53,15 +55,15 @@ define BuildVariant
 endef
 
 define Build/Compile
-	# Check if Zig is available, download if not
-	@if [ ! -f "$(ZIG)" ]; then \
-		echo "Zig not found, downloading..."; \
+	# Use the pinned Zig version, downloading it if the staged compiler differs
+	@if [ ! -x "$(ZIG)" ] || [ "$$($(ZIG) version)" != "$(ZIG_VERSION)" ]; then \
+		echo "Downloading Zig $(ZIG_VERSION)..."; \
 		mkdir -p $(PKG_BUILD_DIR)/zig-tmp; \
 		cd $(PKG_BUILD_DIR)/zig-tmp && \
-		wget -q -O zig.tar.xz https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz && \
-		tar xf zig.tar.xz; \
+		wget -q -O zig.tar.xz https://ziglang.org/download/$(ZIG_VERSION)/$(ZIG_DIST).tar.xz && \
+		tar xf zig.tar.xz && \
 		$(call BuildVariant, \
-			$(PKG_BUILD_DIR)/zig-tmp/zig-x86_64-linux-0.16.0/zig, \
+			$(PKG_BUILD_DIR)/zig-tmp/$(ZIG_DIST)/zig, \
 			-Duci=true -Dubus=true -Dfrpc=false -Dfrps=false -Dddns=false -Dnftables=true -Dwol=true, \
 			$(PKG_INSTALL_DIR)); \
 	else \
