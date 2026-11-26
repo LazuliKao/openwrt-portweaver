@@ -17,13 +17,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.0",
-    "@dotenvx/dotenvx": "^1.71.3",
-    "@lazulikao/luci-types": "github:LazuliKao/luci-types#fe8946745d87eaf7d49156dd76a55186cf8c7fae",
+    "@dotenvx/dotenvx": "^2.38.2",
+    "@lazulikao/luci-types": "github:LazuliKao/luci-types#8fcd48bf65028d17e9975502d147fdf1d62f77c0",
     "@rsbuild/core": "^2.0.12",
     "@types/node": "^20.19.43",
     "@types/ssh2": "^1.15.5",
-    "chokidar": "^5.0.0",
-    "monaco-editor": "0.56.0",
+    "chokidar": "^6.0.0",
+    "monaco-editor": "^0.56.0",
     "ssh2": "^1.17.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
