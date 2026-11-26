@@ -84,7 +84,7 @@ class RatholeConfigEditor extends L.form.Value {
         : "none";
   }
 
-  private validate(sectionId: string): void {
+  private validateConfig(sectionId: string): void {
     this.setMessage(sectionId, _("Validating configuration..."));
     void rpcClient
       .validateRatholeConfig(this.editorOptions.mode, this.getValue(sectionId))
@@ -238,7 +238,7 @@ class RatholeConfigEditor extends L.form.Value {
     this.sessions.set(sectionId, session);
     this.updateSourceControls(sectionId);
     loadButton.onclick = () => this.loadFile(sectionId);
-    validateButton.onclick = () => this.validate(sectionId);
+    validateButton.onclick = () => this.validateConfig(sectionId);
     saveButton.onclick = () => this.saveFile(sectionId, false);
     saveReloadButton.onclick = () => this.saveFile(sectionId, true);
 
@@ -320,7 +320,7 @@ export function addRatholeNodeConfigSource(
 
   const editor = section.option(
     class extends RatholeConfigEditor {
-      protected override readonly editorOptions = {
+      protected override readonly editorOptions: EditorOptions = {
         mode,
         getMode: (sectionId: string) =>
           values.get(

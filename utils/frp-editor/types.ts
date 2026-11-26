@@ -6,7 +6,7 @@ export type FrpEditorFormat = "toml" | "yaml" | "json";
 
 export type MonacoAPI = Pick<
   typeof Monaco,
-  "MarkerSeverity" | "Uri" | "editor" | "languages"
+  "KeyCode" | "MarkerSeverity" | "Uri" | "editor" | "languages"
 >;
 export type MonacoJSONDefaults = LanguageServiceDefaults;
 
